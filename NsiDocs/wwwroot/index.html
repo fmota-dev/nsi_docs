@@ -1,0 +1,1673 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#2d4a3f">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <title>NSI Docs</title>
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="apple-touch-icon" href="/icons/icon-192.png">
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%23f6f0e3'/%3E%3Cpath d='M18 18h28v28H18z' fill='none' stroke='%232d4a3f' stroke-width='4'/%3E%3Cpath d='M25 27h14M25 35h14' stroke='%23b0612b' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+
+        :root {
+            --bg: #f3ecde;
+            --bg-soft: #f8f3e8;
+            --panel: rgba(250, 245, 235, 0.92);
+            --panel-strong: #fffaf0;
+            --line: rgba(60, 44, 26, 0.16);
+            --line-strong: rgba(60, 44, 26, 0.28);
+            --text: #1f1a16;
+            --text-soft: #6a5b4d;
+            --text-faint: #90806f;
+            --accent: #2d4a3f;
+            --accent-soft: rgba(45, 74, 63, 0.12);
+            --amber: #b0612b;
+            --amber-soft: rgba(176, 97, 43, 0.13);
+            --danger: #9c3e33;
+            --success: #2f7757;
+            --shadow: 0 18px 40px rgba(52, 39, 24, 0.08);
+            --radius-lg: 20px;
+            --radius-md: 14px;
+            --radius-sm: 10px;
+            --speed: 180ms;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        html {
+            height: 100%;
+            scroll-behavior: smooth;
+        }
+
+        body {
+            margin: 0;
+            height: 100vh;
+            overflow: hidden;
+            font-family: "IBM Plex Sans", sans-serif;
+            color: var(--text);
+            background:
+                radial-gradient(circle at top left, rgba(45, 74, 63, 0.08), transparent 24%),
+                radial-gradient(circle at bottom right, rgba(176, 97, 43, 0.12), transparent 24%),
+                linear-gradient(180deg, #f8f3e8 0%, var(--bg) 100%);
+        }
+
+        body::before {
+            content: "";
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            opacity: 0.3;
+            background-image:
+                linear-gradient(rgba(64, 49, 31, 0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(64, 49, 31, 0.03) 1px, transparent 1px);
+            background-size: 26px 26px;
+        }
+
+        button,
+        input,
+        textarea {
+            font: inherit;
+        }
+
+        button,
+        textarea,
+        .box,
+        .msg,
+        .history-item,
+        .doc-item,
+        .stat {
+            transition:
+                transform var(--speed) ease,
+                background-color var(--speed) ease,
+                border-color var(--speed) ease,
+                box-shadow var(--speed) ease,
+                opacity var(--speed) ease;
+        }
+
+        :focus-visible {
+            outline: 2px solid rgba(45, 74, 63, 0.34);
+            outline-offset: 3px;
+        }
+
+        .app {
+            width: min(1600px, calc(100vw - 20px));
+            margin: 0 auto;
+            padding: 10px 0;
+            display: grid;
+            grid-template-columns: 280px minmax(0, 1fr) 300px;
+            grid-template-areas: "left main right";
+            gap: 16px;
+            height: 100vh;
+        }
+
+        .shell {
+            border: 1px solid var(--line);
+            border-radius: 24px;
+            background: var(--panel);
+            backdrop-filter: blur(10px);
+            box-shadow: var(--shadow);
+            min-height: 0;
+            overflow: hidden;
+            animation: rise 220ms ease both;
+        }
+
+        .leftbar {
+            grid-area: left;
+        }
+
+        .rightbar {
+            grid-area: right;
+        }
+
+        .sidebar,
+        .main {
+            height: calc(100vh - 20px);
+            min-height: 0;
+        }
+
+        .sidebar {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            padding: 14px;
+            overflow: hidden;
+        }
+
+        .main {
+            grid-area: main;
+            display: grid;
+            grid-template-rows: auto minmax(0, 1fr) auto;
+            gap: 14px;
+            padding: 14px;
+            overflow: hidden;
+        }
+
+        .topbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 14px 16px;
+            border: 1px solid var(--line);
+            border-radius: 18px;
+            background: linear-gradient(180deg, rgba(255,255,255,0.7), rgba(247, 240, 228, 0.84));
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            min-width: 0;
+        }
+
+        .brand-mark {
+            width: 40px;
+            height: 40px;
+            border-radius: 12px;
+            display: grid;
+            place-items: center;
+            border: 1px solid var(--line);
+            background:
+                linear-gradient(135deg, rgba(45, 74, 63, 0.12), rgba(176, 97, 43, 0.12));
+            font-family: "IBM Plex Mono", monospace;
+            font-weight: 600;
+            color: var(--accent);
+        }
+
+        .brand-title {
+            margin: 0;
+            font-size: 1.06rem;
+            font-weight: 700;
+            letter-spacing: -0.02em;
+        }
+
+        .mono,
+        .chip,
+        .section-title,
+        .msg-meta,
+        .status-line,
+        .helper,
+        .tiny {
+            font-family: "IBM Plex Mono", monospace;
+        }
+
+        .brand-subtitle,
+        .helper,
+        .tiny {
+            color: var(--text-soft);
+            font-size: 0.84rem;
+        }
+
+        .topbar-right,
+        .toolbar,
+        .toolbar-right,
+        .upload-actions,
+        .composer-actions,
+        .composer-footer {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 10px;
+            border-radius: 999px;
+            border: 1px solid var(--line);
+            background: rgba(255, 252, 246, 0.86);
+            font-size: 0.76rem;
+            color: var(--text-soft);
+        }
+
+        .chip::before {
+            content: "";
+            width: 7px;
+            height: 7px;
+            border-radius: 999px;
+            background: linear-gradient(135deg, var(--accent), var(--amber));
+        }
+
+        .box {
+            border: 1px solid var(--line);
+            border-radius: var(--radius-lg);
+            background: linear-gradient(180deg, rgba(255,255,255,0.7), rgba(247, 240, 228, 0.9));
+            padding: 14px;
+        }
+
+        .box:hover,
+        .history-item:hover,
+        .doc-item:hover,
+        .stat:hover {
+            transform: translateY(-1px);
+            border-color: var(--line-strong);
+        }
+
+        .section-title {
+            margin: 0 0 12px;
+            font-size: 0.74rem;
+            letter-spacing: 0.12em;
+            color: var(--text-faint);
+            text-transform: uppercase;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 8px;
+        }
+
+        .stat {
+            padding: 12px;
+            border: 1px solid var(--line);
+            border-radius: var(--radius-md);
+            background: rgba(255, 252, 246, 0.86);
+        }
+
+        .stat-value {
+            display: block;
+            font-family: "IBM Plex Mono", monospace;
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--accent);
+            margin-bottom: 4px;
+        }
+
+        .status-line {
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px dashed rgba(60, 44, 26, 0.16);
+            color: var(--text-soft);
+            font-size: 0.78rem;
+            word-break: break-word;
+        }
+
+        .dropzone {
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            justify-content: center;
+            min-height: 112px;
+            border: 1px dashed rgba(45, 74, 63, 0.34);
+            border-radius: var(--radius-md);
+            padding: 14px;
+            background: linear-gradient(180deg, rgba(255,255,255,0.74), rgba(246, 239, 227, 0.9));
+        }
+
+        .dropzone.active {
+            background: linear-gradient(180deg, rgba(233, 242, 237, 0.95), rgba(244, 239, 231, 0.95));
+            border-color: rgba(45, 74, 63, 0.54);
+        }
+
+        .dropzone input[type="file"] {
+            position: absolute;
+            inset: 0;
+            opacity: 0;
+            cursor: pointer;
+        }
+
+        .dropzone-main {
+            font-size: 0.92rem;
+            font-weight: 600;
+        }
+
+        .upload-actions {
+            margin-top: 10px;
+        }
+
+        .file-name {
+            margin-top: 10px;
+            display: none;
+            padding: 8px 10px;
+            border-radius: 10px;
+            background: var(--panel-strong);
+            border: 1px solid var(--line);
+            font-size: 0.84rem;
+        }
+
+        .file-name.visible {
+            display: block;
+        }
+
+        .btn {
+            border: 1px solid var(--line);
+            border-radius: 12px;
+            padding: 11px 14px;
+            cursor: pointer;
+            font-weight: 600;
+            background: rgba(255, 250, 242, 0.92);
+            color: var(--text);
+        }
+
+        .btn.primary {
+            border-color: rgba(45, 74, 63, 0.34);
+            background: linear-gradient(135deg, var(--accent) 0%, #3f5e52 100%);
+            color: #f7f4ed;
+            box-shadow: 0 10px 20px rgba(45, 74, 63, 0.16);
+        }
+
+        .btn:hover:not(:disabled) {
+            transform: translateY(-1px);
+        }
+
+        .btn:disabled {
+            opacity: 0.68;
+            cursor: wait;
+            transform: none;
+        }
+
+        .stack {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            max-height: 260px;
+            overflow: auto;
+            padding-right: 4px;
+        }
+
+        .history-item,
+        .doc-item {
+            width: 100%;
+            text-align: left;
+            border: 1px solid var(--line);
+            border-radius: var(--radius-md);
+            background: rgba(255, 252, 246, 0.9);
+            padding: 12px;
+        }
+
+        .history-item strong,
+        .doc-item strong {
+            display: block;
+            margin-bottom: 6px;
+            font-size: 0.9rem;
+            line-height: 1.45;
+        }
+
+        .history-preview {
+            color: var(--text-faint);
+            font-size: 0.8rem;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+
+        .chat {
+            min-height: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            overflow: hidden;
+        }
+
+        .toolbar {
+            justify-content: space-between;
+            padding: 4px 2px 0;
+        }
+
+        .toolbar-left {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .toolbar-title {
+            font-size: 0.98rem;
+            font-weight: 700;
+        }
+
+        .toolbar-right {
+            justify-content: flex-end;
+        }
+
+        .messages {
+            flex: 1 1 auto;
+            min-height: 0;
+            overflow-x: hidden;
+            overflow-y: auto;
+            overscroll-behavior: contain;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            padding: 2px 8px 2px 0;
+            scroll-behavior: smooth;
+        }
+
+        .messages > * {
+            flex: 0 0 auto;
+        }
+
+        .empty {
+            border: 1px dashed var(--line);
+            border-radius: var(--radius-lg);
+            background: rgba(255, 252, 246, 0.78);
+            padding: 18px;
+        }
+
+        .empty-actions {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-top: 12px;
+        }
+
+        .quick {
+            border: 1px solid var(--line);
+            border-radius: 999px;
+            background: var(--panel-strong);
+            padding: 8px 12px;
+            cursor: pointer;
+            font-family: "IBM Plex Mono", monospace;
+            font-size: 0.76rem;
+        }
+
+        .msg {
+            display: flex;
+            flex-direction: column;
+            flex: 0 0 auto;
+            max-width: min(900px, 88%);
+            border: 1px solid var(--line);
+            border-radius: 18px;
+            overflow: hidden;
+            animation: rise 180ms ease;
+        }
+
+        .msg.user {
+            min-width: min(340px, 68%);
+            align-self: flex-end;
+            border-color: rgba(45, 74, 63, 0.28);
+            background: linear-gradient(180deg, rgba(223, 236, 229, 0.98), rgba(213, 228, 220, 0.98));
+            box-shadow: 0 8px 18px rgba(45, 74, 63, 0.09);
+        }
+
+        .msg.assistant {
+            align-self: flex-start;
+            background: linear-gradient(180deg, rgba(255,255,255,0.94), rgba(247, 240, 229, 0.98));
+            box-shadow: 0 8px 18px rgba(52, 39, 24, 0.05);
+        }
+
+        .msg.error {
+            border-color: rgba(156, 62, 51, 0.32);
+            background: linear-gradient(180deg, rgba(255, 247, 244, 0.96), rgba(252, 238, 234, 0.96));
+        }
+
+        .msg-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 14px;
+            border-bottom: 1px solid rgba(60, 44, 26, 0.1);
+            background: rgba(255,255,255,0.34);
+        }
+
+        .msg-role {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.82rem;
+            font-weight: 600;
+        }
+
+        .msg-role::before {
+            content: "";
+            width: 8px;
+            height: 8px;
+            border-radius: 999px;
+            background: linear-gradient(135deg, var(--accent), var(--amber));
+        }
+
+        .msg.user .msg-role::before {
+            background: linear-gradient(135deg, var(--accent), #86a79a);
+        }
+
+        .msg-meta {
+            color: var(--text-soft);
+            font-size: 0.72rem;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+        }
+
+        .msg-body {
+            padding: 14px;
+        }
+
+        .msg-user-text {
+            white-space: pre-wrap;
+            line-height: 1.65;
+            color: #203027;
+            font-weight: 600;
+            font-size: 0.95rem;
+        }
+
+        .markdown {
+            line-height: 1.7;
+            font-size: 0.95rem;
+        }
+
+        .markdown p:first-child,
+        .markdown h1:first-child,
+        .markdown h2:first-child,
+        .markdown h3:first-child {
+            margin-top: 0;
+        }
+
+        .markdown h1,
+        .markdown h2,
+        .markdown h3,
+        .markdown h4 {
+            font-size: 1rem;
+            margin: 1.1em 0 0.5em;
+            font-weight: 700;
+        }
+
+        .markdown ul,
+        .markdown ol {
+            padding-left: 1.2rem;
+        }
+
+        .markdown code {
+            font-family: "IBM Plex Mono", monospace;
+            font-size: 0.88em;
+            background: rgba(45, 74, 63, 0.08);
+            padding: 0.15em 0.4em;
+            border-radius: 8px;
+            color: var(--accent);
+        }
+
+        .markdown pre {
+            margin: 1em 0;
+            padding: 14px;
+            overflow: auto;
+            border-radius: var(--radius-md);
+            background: #21261f;
+            color: #f1f5ef;
+        }
+
+        .markdown pre code {
+            background: transparent;
+            color: inherit;
+            padding: 0;
+        }
+
+        .markdown blockquote {
+            margin: 1em 0;
+            padding: 10px 12px;
+            border-left: 3px solid rgba(45, 74, 63, 0.42);
+            background: rgba(45, 74, 63, 0.05);
+        }
+
+        .markdown table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1em 0;
+            border: 1px solid var(--line);
+        }
+
+        .markdown th,
+        .markdown td {
+            text-align: left;
+            padding: 10px 12px;
+            border-bottom: 1px solid rgba(60, 44, 26, 0.08);
+        }
+
+        .markdown th {
+            background: rgba(45, 74, 63, 0.08);
+            font-family: "IBM Plex Mono", monospace;
+            font-size: 0.76rem;
+        }
+
+        .context {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-top: 12px;
+        }
+
+        .context-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 7px 10px;
+            border-radius: 999px;
+            border: 1px solid var(--line);
+            background: var(--panel-strong);
+            font-family: "IBM Plex Mono", monospace;
+            font-size: 0.74rem;
+            color: var(--text-soft);
+        }
+
+        .typing {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            color: var(--text-soft);
+            font-family: "IBM Plex Mono", monospace;
+            font-size: 0.82rem;
+        }
+
+        .dots {
+            display: inline-flex;
+            gap: 4px;
+        }
+
+        .dots span {
+            width: 7px;
+            height: 7px;
+            border-radius: 999px;
+            background: linear-gradient(135deg, var(--accent), var(--amber));
+            animation: blink 1s infinite ease-in-out;
+        }
+
+        .dots span:nth-child(2) {
+            animation-delay: 120ms;
+        }
+
+        .dots span:nth-child(3) {
+            animation-delay: 240ms;
+        }
+
+        .composer {
+            border: 1px solid var(--line);
+            border-radius: 18px;
+            background: linear-gradient(180deg, rgba(255,255,255,0.76), rgba(246, 239, 227, 0.92));
+            padding: 12px;
+        }
+
+        .composer-grid {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto;
+            gap: 10px;
+            align-items: end;
+        }
+
+        textarea {
+            width: 100%;
+            min-height: 74px;
+            max-height: 220px;
+            resize: none;
+            border: 1px solid transparent;
+            border-radius: 14px;
+            background: rgba(255, 252, 246, 0.96);
+            padding: 14px;
+            line-height: 1.6;
+            color: var(--text);
+            box-shadow: inset 0 0 0 1px rgba(60, 44, 26, 0.1);
+        }
+
+        textarea:hover {
+            box-shadow: inset 0 0 0 1px rgba(60, 44, 26, 0.18);
+        }
+
+        textarea:focus {
+            outline: none;
+            box-shadow:
+                inset 0 0 0 1px rgba(45, 74, 63, 0.24),
+                0 0 0 4px rgba(45, 74, 63, 0.08);
+        }
+
+        .composer-actions {
+            display: grid;
+            gap: 8px;
+            min-width: 144px;
+        }
+
+        .composer-footer {
+            justify-content: space-between;
+            margin-top: 10px;
+        }
+
+        .notice {
+            color: var(--text-soft);
+            font-size: 0.82rem;
+        }
+
+        .notice.success {
+            color: var(--success);
+        }
+
+        .notice.error {
+            color: var(--danger);
+        }
+
+        .offline-banner {
+            position: fixed;
+            top: 12px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 120;
+            min-width: min(520px, calc(100vw - 36px));
+            padding: 10px 14px;
+            border-radius: 12px;
+            border: 1px solid rgba(156, 62, 51, 0.34);
+            background: linear-gradient(180deg, rgba(255, 247, 244, 0.96), rgba(252, 238, 234, 0.94));
+            color: #7f3129;
+            font-family: "IBM Plex Mono", monospace;
+            font-size: 0.8rem;
+            box-shadow: 0 12px 28px rgba(87, 37, 30, 0.14);
+            display: none;
+        }
+
+        .offline-banner.visible {
+            display: block;
+            animation: rise 160ms ease;
+        }
+
+        .install-cta {
+            position: fixed;
+            right: 18px;
+            top: 14px;
+            z-index: 130;
+            display: none;
+            align-items: center;
+            gap: 8px;
+            border-radius: 999px;
+            border: 1px solid rgba(45, 74, 63, 0.34);
+            background: linear-gradient(135deg, var(--accent) 0%, #3f5e52 100%);
+            color: #f7f4ed;
+            padding: 11px 16px;
+            box-shadow: 0 14px 26px rgba(45, 74, 63, 0.22);
+            font-family: "IBM Plex Mono", monospace;
+            font-size: 0.78rem;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .install-cta.visible {
+            display: inline-flex;
+            animation: rise 160ms ease;
+        }
+
+        .scroll::-webkit-scrollbar {
+            width: 12px;
+            height: 12px;
+        }
+
+        .scroll {
+            scrollbar-width: thin;
+            scrollbar-color: rgba(176, 97, 43, 0.56) rgba(60, 44, 26, 0.06);
+            overscroll-behavior: contain;
+        }
+
+        .scroll::-webkit-scrollbar-thumb {
+            background: linear-gradient(180deg, rgba(176, 97, 43, 0.72), rgba(45, 74, 63, 0.66));
+            border-radius: 999px;
+            border: 3px solid rgba(0, 0, 0, 0);
+            background-clip: padding-box;
+        }
+
+        .scroll::-webkit-scrollbar-track {
+            background: linear-gradient(180deg, rgba(60, 44, 26, 0.04), rgba(60, 44, 26, 0.02));
+            border-radius: 999px;
+        }
+
+        .scroll::-webkit-scrollbar-corner {
+            background: transparent;
+        }
+
+        @media (max-width: 1280px) {
+            .app {
+                grid-template-columns: minmax(0, 1fr) 280px;
+                grid-template-areas:
+                    "main left"
+                    "main right";
+            }
+
+            .sidebar,
+            .main {
+                height: calc(100vh - 20px);
+            }
+
+            .rightbar {
+                min-height: 260px;
+            }
+        }
+
+        @media (max-width: 900px) {
+            .app {
+                width: calc(100vw - 12px);
+                height: auto;
+                min-height: 100vh;
+                padding: 6px 0 12px;
+                grid-template-columns: 1fr;
+                grid-template-areas:
+                    "main"
+                    "left"
+                    "right";
+            }
+
+            body {
+                height: auto;
+                overflow: auto;
+            }
+
+            .sidebar,
+            .main {
+                height: auto;
+                min-height: auto;
+                padding: 10px;
+            }
+
+            .topbar,
+            .composer-grid,
+            .toolbar,
+            .composer-footer {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .composer-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .topbar-right,
+            .toolbar,
+            .toolbar-right,
+            .upload-actions {
+                align-items: stretch;
+            }
+
+            .upload-actions,
+            .composer-actions {
+                grid-template-columns: 1fr;
+            }
+
+            .upload-actions .btn,
+            .composer-actions .btn,
+            .toolbar-right .btn {
+                width: 100%;
+            }
+
+            .stats {
+                grid-template-columns: 1fr;
+            }
+
+            .offline-banner {
+                min-width: 0;
+                width: calc(100vw - 18px);
+                top: 6px;
+                font-size: 0.76rem;
+            }
+
+            .install-cta {
+                top: auto;
+                bottom: 12px;
+                right: 12px;
+                left: auto;
+            }
+
+            .msg {
+                max-width: 100%;
+                min-width: 0;
+            }
+
+            .stack,
+            .messages {
+                max-height: none;
+            }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            html {
+                scroll-behavior: auto;
+            }
+
+            *,
+            *::before,
+            *::after {
+                animation: none !important;
+                transition: none !important;
+            }
+        }
+
+        @keyframes rise {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes blink {
+            0%, 80%, 100% {
+                opacity: 0.35;
+                transform: translateY(0);
+            }
+            40% {
+                opacity: 1;
+                transform: translateY(-1px);
+            }
+        }
+
+        /* estilos */
+    </style>
+</head>
+<body>
+    <div id="aviso-conectividade" class="offline-banner" role="status" aria-live="polite">
+        Sem conexão. O app abre offline, mas chat, upload e recarregar índice exigem rede.
+    </div>
+    <button id="botao-instalar-app" type="button" class="install-cta">Instalar app</button>
+    <div class="app">
+        <aside class="shell sidebar leftbar">
+            <section class="box">
+                <div class="brand">
+                    <div class="brand-mark">NSI</div>
+                    <div>
+                        <h1 class="brand-title">NSI Docs</h1>
+                        <div class="brand-subtitle mono">chat + markdown + docs</div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="box">
+                <div class="section-title">status</div>
+                <div class="stats">
+                    <div class="stat">
+                        <span id="top-projetos" class="stat-value">...</span>
+                        <span class="tiny">projetos</span>
+                    </div>
+                    <div class="stat">
+                        <span id="top-secoes" class="stat-value">...</span>
+                        <span class="tiny">seções</span>
+                    </div>
+                </div>
+                <div id="status-line" class="status-line">modelo: ...</div>
+            </section>
+
+            <section class="box">
+                <div class="section-title">upload</div>
+                <form id="form-upload">
+                    <label id="dropzone" class="dropzone">
+                        <input id="arquivo" name="arquivo" type="file" accept=".md,text/markdown">
+                        <div class="dropzone-main">arraste um `.md` ou clique</div>
+                        <div class="helper">somente markdown</div>
+                        <div id="nome-arquivo" class="file-name"></div>
+                    </label>
+
+                    <div class="upload-actions" style="margin-top: 10px;">
+                        <button id="botao-upload" type="submit" class="btn primary">Enviar</button>
+                        <button id="botao-recarregar" type="button" class="btn">Recarregar</button>
+                    </div>
+
+                    <div id="mensagem-upload" class="notice" style="margin-top: 10px;"></div>
+                </form>
+            </section>
+        </aside>
+
+        <main class="shell main">
+            <header class="topbar">
+                <div class="brand">
+                    <div>
+                        <div class="brand-title">console</div>
+                        <div class="brand-subtitle mono">respostas formatadas em markdown</div>
+                    </div>
+                </div>
+
+                <div class="topbar-right">
+                    <span id="chip-modelo" class="chip">modelo: ...</span>
+                    <span id="chip-projetos" class="chip">projetos: ...</span>
+                    <span id="chip-secoes" class="chip">seções: ...</span>
+                </div>
+            </header>
+
+            <section class="chat">
+                <div class="toolbar">
+                    <div class="toolbar-left">
+                        <div class="toolbar-title">chat</div>
+                        <div class="helper mono">enter envia / shift+enter quebra linha</div>
+                    </div>
+                    <div class="toolbar-right">
+                        <div id="mensagem-chat" class="notice"></div>
+                        <button id="limpar-chat" type="button" class="btn">Limpar</button>
+                    </div>
+                </div>
+
+                <div id="mensagens" class="messages scroll"></div>
+            </section>
+
+            <form id="form-chat" class="composer">
+                <div class="composer-grid">
+                    <textarea id="pergunta" placeholder="Ex.: stack do carreiras, integrações do portal-estagios, segurança do cipa..." spellcheck="false"></textarea>
+                    <div class="composer-actions">
+                        <button id="botao-perguntar" type="submit" class="btn primary">Perguntar</button>
+                        <button id="botao-exemplo" type="button" class="btn">Exemplo</button>
+                    </div>
+                </div>
+
+                <div class="composer-footer">
+                    <div class="helper">perguntas mais específicas costumam ser mais rápidas</div>
+                    <div id="contador-caracteres" class="tiny">0 caractere</div>
+                </div>
+            </form>
+        </main>
+
+        <aside class="shell sidebar rightbar">
+            <section class="box">
+                <div class="section-title">docs <span id="contador-docs" class="tiny"></span></div>
+                <div id="lista-documentos" class="stack scroll">
+                    <div class="helper">carregando...</div>
+                </div>
+            </section>
+
+            <section class="box">
+                <div class="section-title">histórico <span id="contador-historico" class="tiny"></span></div>
+                <div id="lista-historico" class="stack scroll">
+                    <div class="helper">sem perguntas ainda</div>
+                </div>
+            </section>
+        </aside>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/dompurify@3.1.6/dist/purify.min.js"></script>
+    <script>
+        const elementos = {
+            topProjetos: document.getElementById("top-projetos"),
+            topSecoes: document.getElementById("top-secoes"),
+            statusLine: document.getElementById("status-line"),
+            chipModelo: document.getElementById("chip-modelo"),
+            chipProjetos: document.getElementById("chip-projetos"),
+            chipSecoes: document.getElementById("chip-secoes"),
+            contadorDocs: document.getElementById("contador-docs"),
+            contadorHistorico: document.getElementById("contador-historico"),
+            listaDocumentos: document.getElementById("lista-documentos"),
+            listaHistorico: document.getElementById("lista-historico"),
+            mensagens: document.getElementById("mensagens"),
+            mensagemChat: document.getElementById("mensagem-chat"),
+            mensagemUpload: document.getElementById("mensagem-upload"),
+            pergunta: document.getElementById("pergunta"),
+            contadorCaracteres: document.getElementById("contador-caracteres"),
+            arquivo: document.getElementById("arquivo"),
+            nomeArquivo: document.getElementById("nome-arquivo"),
+            dropzone: document.getElementById("dropzone"),
+            formChat: document.getElementById("form-chat"),
+            formUpload: document.getElementById("form-upload"),
+            botaoPerguntar: document.getElementById("botao-perguntar"),
+            botaoExemplo: document.getElementById("botao-exemplo"),
+            botaoUpload: document.getElementById("botao-upload"),
+            botaoRecarregar: document.getElementById("botao-recarregar"),
+            limparChat: document.getElementById("limpar-chat"),
+            avisoConectividade: document.getElementById("aviso-conectividade"),
+            botaoInstalarApp: document.getElementById("botao-instalar-app")
+        };
+
+        const chaveHistorico = "nsi-docs-historico";
+        let mensagemPendente = null;
+        let conectado = navigator.onLine;
+        let carregandoPergunta = false;
+        let carregandoUpload = false;
+        let promptInstalacao = null;
+
+        function aviso(elemento, texto, tipo = "") {
+            elemento.textContent = texto;
+            elemento.className = "notice";
+            if (tipo) {
+                elemento.classList.add(tipo);
+            }
+        }
+
+        async function registrarServiceWorker() {
+            if (!("serviceWorker" in navigator)) {
+                return;
+            }
+
+            try {
+                await navigator.serviceWorker.register("/service-worker.js");
+            } catch (erro) {
+                console.error("Falha ao registrar service worker:", erro);
+            }
+        }
+
+        function atualizarDisponibilidadeBotoesRede() {
+            elementos.botaoPerguntar.disabled = carregandoPergunta || !conectado;
+            elementos.botaoExemplo.disabled = carregandoPergunta;
+            elementos.botaoUpload.disabled = carregandoUpload || !conectado;
+            elementos.botaoRecarregar.disabled = carregandoUpload || !conectado;
+            elementos.arquivo.disabled = carregandoUpload || !conectado;
+        }
+
+        function atualizarConectividadeUI() {
+            if (conectado) {
+                elementos.avisoConectividade.classList.remove("visible");
+            } else {
+                elementos.avisoConectividade.classList.add("visible");
+                aviso(elementos.mensagemChat, "sem conexão: consultas e upload exigem rede", "error");
+            }
+
+            atualizarDisponibilidadeBotoesRede();
+        }
+
+        function configurarInstalacaoPwa() {
+            const emModoInstalado = window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone === true;
+            if (emModoInstalado) {
+                elementos.botaoInstalarApp.classList.remove("visible");
+                return;
+            }
+
+            window.addEventListener("beforeinstallprompt", evento => {
+                evento.preventDefault();
+                promptInstalacao = evento;
+                elementos.botaoInstalarApp.classList.add("visible");
+            });
+
+            window.addEventListener("appinstalled", () => {
+                promptInstalacao = null;
+                elementos.botaoInstalarApp.classList.remove("visible");
+            });
+        }
+
+        function escaparHtml(valor = "") {
+            return valor
+                .replaceAll("&", "&amp;")
+                .replaceAll("<", "&lt;")
+                .replaceAll(">", "&gt;")
+                .replaceAll('"', "&quot;")
+                .replaceAll("'", "&#039;");
+        }
+
+        function renderizarMarkdownSeguro(markdown = "") {
+            if (!window.marked || !window.DOMPurify) {
+                return `<p>${escaparHtml(markdown).replace(/\n/g, "<br>")}</p>`;
+            }
+
+            marked.setOptions({
+                gfm: true,
+                breaks: true
+            });
+
+            return DOMPurify.sanitize(marked.parse(markdown), {
+                USE_PROFILES: { html: true }
+            });
+        }
+
+        function extrairResumoMarkdown(markdown = "") {
+            if (window.marked && window.DOMPurify) {
+                const temporario = document.createElement("div");
+                temporario.innerHTML = renderizarMarkdownSeguro(markdown);
+                return (temporario.textContent || temporario.innerText || "").replace(/\s+/g, " ").trim();
+            }
+
+            return markdown.replace(/[*_`>#-]/g, " ").replace(/\s+/g, " ").trim();
+        }
+
+        function formatarContagem(valor, singular, plural) {
+            return `${valor} ${valor === 1 ? singular : plural}`;
+        }
+
+        function atualizarContadorCaracteres() {
+            const quantidade = elementos.pergunta.value.length;
+            elementos.contadorCaracteres.textContent = formatarContagem(quantidade, "caractere", "caracteres");
+        }
+
+        function ajustarAlturaTextarea() {
+            elementos.pergunta.style.height = "auto";
+            elementos.pergunta.style.height = `${Math.min(elementos.pergunta.scrollHeight, 220)}px`;
+        }
+
+        function htmlEstadoVazio() {
+            return `
+                <section class="empty">
+                    <div class="section-title" style="margin-bottom: 8px;">atalhos</div>
+                    <div class="helper">use uma das perguntas rápidas abaixo ou escreva a sua</div>
+                    <div class="empty-actions">
+                        <button type="button" class="quick" data-pergunta="Que stack é usada no projeto do carreiras?">stack / carreiras</button>
+                        <button type="button" class="quick" data-pergunta="Quais integrações existem no portal de estágios?">integrações / portal</button>
+                        <button type="button" class="quick" data-pergunta="Como funciona a segurança no CIPA?">segurança / cipa</button>
+                    </div>
+                </section>
+            `;
+        }
+
+        function resetarConversa() {
+            elementos.mensagens.innerHTML = htmlEstadoVazio();
+            mensagemPendente = null;
+            aviso(elementos.mensagemChat, "");
+        }
+
+        function removerEstadoVazio() {
+            const vazio = elementos.mensagens.querySelector(".empty");
+            if (vazio) {
+                vazio.remove();
+            }
+        }
+
+        function chipsContexto(secoes = []) {
+            if (!secoes.length) {
+                return "";
+            }
+
+            return `
+                <div class="context">
+                    ${secoes.map(secao => `
+                        <span class="context-chip">${escaparHtml(secao.projeto)} -> ${escaparHtml(secao.titulo)}</span>
+                    `).join("")}
+                </div>
+            `;
+        }
+
+        function rolarFim() {
+            elementos.mensagens.scrollTop = elementos.mensagens.scrollHeight;
+        }
+
+        function adicionarMensagemUsuario(texto) {
+            removerEstadoVazio();
+            const horario = new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+            const bloco = document.createElement("article");
+            bloco.className = "msg user";
+            bloco.innerHTML = `
+                <div class="msg-head">
+                    <span class="msg-role">você</span>
+                    <span class="msg-meta">${horario}</span>
+                </div>
+                <div class="msg-body">
+                    <div class="msg-user-text">${escaparHtml(texto)}</div>
+                </div>
+            `;
+
+            elementos.mensagens.appendChild(bloco);
+            rolarFim();
+        }
+
+        function mostrarMensagemPendente() {
+            removerEstadoVazio();
+            mensagemPendente = document.createElement("article");
+            mensagemPendente.className = "msg assistant";
+            mensagemPendente.innerHTML = `
+                <div class="msg-head">
+                    <span class="msg-role">nsi docs</span>
+                    <span class="msg-meta">aguarde</span>
+                </div>
+                <div class="msg-body">
+                    <div class="typing">
+                        <span class="dots" aria-hidden="true"><span></span><span></span><span></span></span>
+                        processando consulta
+                    </div>
+                </div>
+            `;
+
+            elementos.mensagens.appendChild(mensagemPendente);
+            rolarFim();
+        }
+
+        function removerMensagemPendente() {
+            if (mensagemPendente) {
+                mensagemPendente.remove();
+                mensagemPendente = null;
+            }
+        }
+
+        function adicionarMensagemAssistente(markdown, secoes = [], erro = false) {
+            removerEstadoVazio();
+            removerMensagemPendente();
+
+            const horario = new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+            const bloco = document.createElement("article");
+            bloco.className = `msg assistant${erro ? " error" : ""}`;
+            bloco.innerHTML = `
+                <div class="msg-head">
+                    <span class="msg-role">nsi docs</span>
+                    <span class="msg-meta">${erro ? "erro" : horario}</span>
+                </div>
+                <div class="msg-body">
+                    <div class="markdown">${renderizarMarkdownSeguro(markdown)}</div>
+                    ${chipsContexto(secoes)}
+                </div>
+            `;
+
+            elementos.mensagens.appendChild(bloco);
+            rolarFim();
+        }
+
+        function obterHistorico() {
+            try {
+                return JSON.parse(localStorage.getItem(chaveHistorico) || "[]");
+            } catch {
+                return [];
+            }
+        }
+
+        function salvarHistorico(pergunta, resposta) {
+            const historico = obterHistorico()
+                .filter(item => item.pergunta !== pergunta)
+                .slice(0, 7);
+
+            historico.unshift({
+                pergunta,
+                resposta,
+                resumo: extrairResumoMarkdown(resposta),
+                instante: new Date().toLocaleString("pt-BR")
+            });
+
+            localStorage.setItem(chaveHistorico, JSON.stringify(historico));
+            renderizarHistorico();
+        }
+
+        function renderizarHistorico() {
+            const historico = obterHistorico();
+            elementos.contadorHistorico.textContent = historico.length ? `[${historico.length}]` : "";
+
+            if (!historico.length) {
+                elementos.listaHistorico.innerHTML = '<div class="helper">sem perguntas ainda</div>';
+                return;
+            }
+
+            elementos.listaHistorico.innerHTML = historico.map((item, indice) => `
+                <button type="button" class="history-item" data-indice="${indice}">
+                    <strong>${escaparHtml(item.pergunta)}</strong>
+                    <div class="history-preview">${escaparHtml(item.resumo || extrairResumoMarkdown(item.resposta))}</div>
+                    <div class="tiny" style="margin-top: 8px;">${escaparHtml(item.instante)}</div>
+                </button>
+            `).join("");
+        }
+
+        async function carregarStatus() {
+            const resposta = await fetch("/api/status");
+            const status = await resposta.json();
+
+            elementos.topProjetos.textContent = status.quantidadeProjetos;
+            elementos.topSecoes.textContent = status.quantidadeSecoes;
+            elementos.statusLine.textContent = `modelo: ${status.modelo}`;
+            elementos.chipModelo.textContent = `modelo: ${status.modelo}`;
+            elementos.chipProjetos.textContent = `projetos: ${status.quantidadeProjetos}`;
+            elementos.chipSecoes.textContent = `seções: ${status.quantidadeSecoes}`;
+        }
+
+        async function carregarDocumentos() {
+            const resposta = await fetch("/api/documentos");
+            const documentos = await resposta.json();
+
+            elementos.contadorDocs.textContent = documentos.length ? `[${documentos.length}]` : "";
+
+            if (!documentos.length) {
+                elementos.listaDocumentos.innerHTML = '<div class="helper">nenhum documento</div>';
+                return;
+            }
+
+            elementos.listaDocumentos.innerHTML = documentos.map(documento => `
+                <article class="doc-item">
+                    <strong>${escaparHtml(documento.nome)}</strong>
+                    <div class="tiny">${escaparHtml(documento.arquivo)}</div>
+                    <div class="tiny" style="margin-top: 6px;">${documento.quantidadeSecoes} seção(ões)</div>
+                </article>
+            `).join("");
+        }
+
+        function atualizarNomeArquivo() {
+            const arquivo = elementos.arquivo.files[0];
+            if (!arquivo) {
+                elementos.nomeArquivo.textContent = "";
+                elementos.nomeArquivo.classList.remove("visible");
+                return;
+            }
+
+            elementos.nomeArquivo.textContent = arquivo.name;
+            elementos.nomeArquivo.classList.add("visible");
+        }
+
+        function definirEstadoPergunta(carregando) {
+            carregandoPergunta = carregando;
+            atualizarDisponibilidadeBotoesRede();
+            if (carregando) {
+                aviso(elementos.mensagemChat, "consultando...");
+                mostrarMensagemPendente();
+            } else {
+                removerMensagemPendente();
+            }
+        }
+
+        function definirEstadoUpload(carregando, mensagem = "", tipo = "") {
+            carregandoUpload = carregando;
+            atualizarDisponibilidadeBotoesRede();
+            aviso(elementos.mensagemUpload, mensagem, tipo);
+        }
+
+        elementos.formChat.addEventListener("submit", async evento => {
+            evento.preventDefault();
+            const pergunta = elementos.pergunta.value.trim();
+
+            if (!pergunta) {
+                aviso(elementos.mensagemChat, "digite uma pergunta", "error");
+                elementos.pergunta.focus();
+                return;
+            }
+
+            if (!conectado) {
+                aviso(elementos.mensagemChat, "sem conexão: nao foi possivel enviar a pergunta", "error");
+                return;
+            }
+
+            adicionarMensagemUsuario(pergunta);
+            elementos.pergunta.value = "";
+            atualizarContadorCaracteres();
+            ajustarAlturaTextarea();
+            definirEstadoPergunta(true);
+
+            try {
+                const resposta = await fetch("/api/chat/perguntar", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({ pergunta })
+                });
+
+                if (resposta.status === 408) {
+                    throw new Error("timeout da consulta; tente algo mais específico");
+                }
+
+                const dados = await resposta.json();
+                if (!resposta.ok) {
+                    throw new Error(dados.mensagem || "falha ao consultar");
+                }
+
+                adicionarMensagemAssistente(dados.resposta, dados.secoesUtilizadas || []);
+                salvarHistorico(pergunta, dados.resposta);
+                aviso(elementos.mensagemChat, "ok", "success");
+            } catch (erro) {
+                adicionarMensagemAssistente(erro.message, [], true);
+                aviso(elementos.mensagemChat, erro.message, "error");
+            } finally {
+                definirEstadoPergunta(false);
+            }
+        });
+
+        elementos.formUpload.addEventListener("submit", async evento => {
+            evento.preventDefault();
+            const arquivo = elementos.arquivo.files[0];
+
+            if (!conectado) {
+                definirEstadoUpload(false, "sem conexão: upload indisponivel", "error");
+                return;
+            }
+
+            if (!arquivo) {
+                definirEstadoUpload(false, "selecione um .md", "error");
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append("arquivo", arquivo);
+            definirEstadoUpload(true, "enviando...");
+
+            try {
+                const resposta = await fetch("/api/documentos/upload", {
+                    method: "POST",
+                    body: formData
+                });
+
+                const dados = await resposta.json();
+                if (!resposta.ok) {
+                    throw new Error(dados.mensagem || "falha no upload");
+                }
+
+                elementos.arquivo.value = "";
+                atualizarNomeArquivo();
+                await Promise.all([carregarStatus(), carregarDocumentos()]);
+                definirEstadoUpload(false, dados.mensagem, "success");
+            } catch (erro) {
+                definirEstadoUpload(false, erro.message, "error");
+            }
+        });
+
+        elementos.botaoRecarregar.addEventListener("click", async () => {
+            if (!conectado) {
+                definirEstadoUpload(false, "sem conexão: recarga indisponivel", "error");
+                return;
+            }
+
+            definirEstadoUpload(true, "recarregando índice...");
+
+            try {
+                const resposta = await fetch("/api/documentos/recarregar", { method: "POST" });
+                const dados = await resposta.json();
+
+                if (!resposta.ok) {
+                    throw new Error(dados.mensagem || "falha ao recarregar");
+                }
+
+                await Promise.all([carregarStatus(), carregarDocumentos()]);
+                definirEstadoUpload(false, `${dados.quantidadeProjetos} projetos / ${dados.quantidadeSecoes} seções`, "success");
+            } catch (erro) {
+                definirEstadoUpload(false, erro.message, "error");
+            }
+        });
+
+        elementos.botaoInstalarApp.addEventListener("click", async () => {
+            if (!promptInstalacao) {
+                aviso(elementos.mensagemChat, "instalação ainda não disponivel neste navegador", "error");
+                return;
+            }
+
+            promptInstalacao.prompt();
+            const escolha = await promptInstalacao.userChoice;
+            if (escolha.outcome === "accepted") {
+                elementos.botaoInstalarApp.classList.remove("visible");
+            }
+
+            promptInstalacao = null;
+        });
+
+        elementos.limparChat.addEventListener("click", () => {
+            resetarConversa();
+        });
+
+        elementos.botaoExemplo.addEventListener("click", () => {
+            elementos.pergunta.value = "Liste a stack usada no projeto do carreiras, separando back-end, front-end, integrações e observabilidade.";
+            atualizarContadorCaracteres();
+            ajustarAlturaTextarea();
+            elementos.pergunta.focus();
+        });
+
+        elementos.listaHistorico.addEventListener("click", evento => {
+            const botao = evento.target.closest("[data-indice]");
+            if (!botao) {
+                return;
+            }
+
+            const historico = obterHistorico();
+            const item = historico[Number(botao.dataset.indice)];
+            if (!item) {
+                return;
+            }
+
+            elementos.pergunta.value = item.pergunta;
+            atualizarContadorCaracteres();
+            ajustarAlturaTextarea();
+            elementos.pergunta.focus();
+        });
+
+        elementos.mensagens.addEventListener("click", evento => {
+            const botao = evento.target.closest("[data-pergunta]");
+            if (!botao) {
+                return;
+            }
+
+            elementos.pergunta.value = botao.dataset.pergunta;
+            atualizarContadorCaracteres();
+            ajustarAlturaTextarea();
+            elementos.pergunta.focus();
+        });
+
+        elementos.pergunta.addEventListener("input", () => {
+            atualizarContadorCaracteres();
+            ajustarAlturaTextarea();
+        });
+
+        elementos.pergunta.addEventListener("keydown", evento => {
+            if (evento.key === "Enter" && !evento.shiftKey) {
+                evento.preventDefault();
+                elementos.formChat.requestSubmit();
+            }
+        });
+
+        elementos.arquivo.addEventListener("change", atualizarNomeArquivo);
+
+        window.addEventListener("online", () => {
+            conectado = true;
+            atualizarConectividadeUI();
+            aviso(elementos.mensagemChat, "conexão restabelecida", "success");
+        });
+
+        window.addEventListener("offline", () => {
+            conectado = false;
+            atualizarConectividadeUI();
+        });
+
+        ["dragenter", "dragover"].forEach(nomeEvento => {
+            elementos.dropzone.addEventListener(nomeEvento, evento => {
+                evento.preventDefault();
+                elementos.dropzone.classList.add("active");
+            });
+        });
+
+        ["dragleave", "drop"].forEach(nomeEvento => {
+            elementos.dropzone.addEventListener(nomeEvento, evento => {
+                evento.preventDefault();
+                elementos.dropzone.classList.remove("active");
+            });
+        });
+
+        elementos.dropzone.addEventListener("drop", evento => {
+            const arquivos = evento.dataTransfer?.files;
+            if (!arquivos?.length) {
+                return;
+            }
+
+            const transferencia = new DataTransfer();
+            Array.from(arquivos).forEach(arquivo => transferencia.items.add(arquivo));
+            elementos.arquivo.files = transferencia.files;
+            atualizarNomeArquivo();
+        });
+
+        async function inicializar() {
+            await registrarServiceWorker();
+            configurarInstalacaoPwa();
+            atualizarConectividadeUI();
+            resetarConversa();
+            renderizarHistorico();
+            atualizarContadorCaracteres();
+            ajustarAlturaTextarea();
+
+            try {
+                await Promise.all([carregarStatus(), carregarDocumentos()]);
+            } catch {
+                aviso(elementos.mensagemChat, "falha ao carregar", "error");
+            }
+        }
+
+        inicializar();
+    </script>
+</body>
+</html>
