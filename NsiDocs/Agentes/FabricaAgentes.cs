@@ -1,6 +1,9 @@
 using System.Text;
+using System.Text.Json;
 using AgentesFramework.Configuracoes;
 using AgentesFramework.Modelos;
+using AgentesFramework.Plugins;
+using AgentesFramework.Servicos;
 using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.Agents;
 
@@ -8,15 +11,29 @@ namespace AgentesFramework.Agentes;
 
 internal sealed class FabricaAgentes
 {
+    private const string NomePluginDocumentacao = "DocumentacaoPlugin";
+
     private readonly Kernel _kernel;
     private readonly List<ProjetoDocumentacao> _projetos;
+    private readonly RecuperadorContexto _recuperadorContexto;
     private readonly ConfiguracaoAplicacao _configuracao;
+    private static readonly JsonSerializerOptions JsonOptions = new()
+    {
+        PropertyNameCaseInsensitive = true
+    };
 
-    public FabricaAgentes(Kernel kernel, List<ProjetoDocumentacao> projetos, ConfiguracaoAplicacao configuracao)
+    public FabricaAgentes(
+        Kernel kernel,
+        List<ProjetoDocumentacao> projetos,
+        RecuperadorContexto recuperadorContexto,
+        ConfiguracaoAplicacao configuracao)
     {
         _kernel = kernel;
         _projetos = projetos;
+        _recuperadorContexto = recuperadorContexto;
         _configuracao = configuracao;
+
+        RegistrarPluginDocumentacao();
     }
 
     public ChatCompletionAgent CriarPlanejador()
@@ -27,6 +44,10 @@ internal sealed class FabricaAgentes
             Instructions = $"""
                             Voce analisa perguntas sobre a documentacao do NSI.
                             Sua tarefa e planejar a consulta com base apenas no indice dos projetos e secoes.
+
+                            Plugin disponivel:
+                            - {NomePluginDocumentacao}.obter_indice_documentacao
+                            - {NomePluginDocumentacao}.buscar_secoes_relevantes
 
                             Responda exatamente neste formato:
                             Projeto: [nome do projeto ou "todos"]
@@ -103,6 +124,58 @@ internal sealed class FabricaAgentes
         return _projetos;
     }
 
+    public async Task<List<SecaoDocumento>> BuscarSecoesRelevantesComPluginAsync(
+        string pergunta,
+        PlanoConsulta planoConsulta,
+        int quantidade,
+        CancellationToken cancellationToken = default)
+    {
+        var argumentos = new KernelArguments
+        {
+            ["pergunta"] = pergunta,
+            ["projetoAlvo"] = planoConsulta.ProjetoAlvo,
+            ["temasCsv"] = string.Join(", ", planoConsulta.Temas),
+            ["quantidade"] = quantidade
+        };
+
+        var resultado = await _kernel.InvokeAsync(
+            NomePluginDocumentacao,
+            "buscar_secoes_relevantes",
+            argumentos,
+            cancellationToken);
+
+        var json = resultado.GetValue<string>() ?? "[]";
+        var secoes = JsonSerializer.Deserialize<List<SecaoPluginResultado>>(json, JsonOptions) ?? [];
+
+        return secoes
+            .Where(secao =>
+                !string.IsNullOrWhiteSpace(secao.Projeto) &&
+                !string.IsNullOrWhiteSpace(secao.Titulo) &&
+                !string.IsNullOrWhiteSpace(secao.Conteudo))
+            .Select(secao => new SecaoDocumento
+            {
+                Projeto = secao.Projeto,
+                Titulo = secao.Titulo,
+                Arquivo = secao.Arquivo,
+                Conteudo = secao.Conteudo
+            })
+            .ToList();
+    }
+
+    private void RegistrarPluginDocumentacao()
+    {
+        if (_kernel.Plugins.TryGetPlugin(NomePluginDocumentacao, out var pluginExistente))
+        {
+            _kernel.Plugins.Remove(pluginExistente);
+        }
+
+        var plugin = KernelPluginFactory.CreateFromObject(
+            new PluginDocumentacaoNsi(_projetos, _recuperadorContexto),
+            NomePluginDocumentacao);
+
+        _kernel.Plugins.Add(plugin);
+    }
+
     private string GerarIndiceDocumentacao()
     {
         var sb = new StringBuilder();
@@ -123,5 +196,13 @@ internal sealed class FabricaAgentes
         }
 
         return sb.ToString();
+    }
+
+    private sealed class SecaoPluginResultado
+    {
+        public string Projeto { get; init; } = string.Empty;
+        public string Titulo { get; init; } = string.Empty;
+        public string Arquivo { get; init; } = string.Empty;
+        public string Conteudo { get; init; } = string.Empty;
     }
 }

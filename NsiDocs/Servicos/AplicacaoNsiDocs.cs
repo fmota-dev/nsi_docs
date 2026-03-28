@@ -10,6 +10,7 @@ internal sealed class AplicacaoNsiDocs
 {
     private readonly ConfiguracaoAplicacao _configuracao;
     private readonly CarregadorDocumentacao _carregadorDocumentacao;
+    private readonly RecuperadorContexto _recuperadorContexto;
     private readonly Kernel _kernel;
     private readonly SemaphoreSlim _semaforo = new(1, 1);
     private List<ProjetoDocumentacao> _projetos = [];
@@ -18,10 +19,12 @@ internal sealed class AplicacaoNsiDocs
     public AplicacaoNsiDocs(
         ConfiguracaoAplicacao configuracao,
         CarregadorDocumentacao carregadorDocumentacao,
+        RecuperadorContexto recuperadorContexto,
         Kernel kernel)
     {
         _configuracao = configuracao;
         _carregadorDocumentacao = carregadorDocumentacao;
+        _recuperadorContexto = recuperadorContexto;
         _kernel = kernel;
     }
 
@@ -135,11 +138,14 @@ internal sealed class AplicacaoNsiDocs
                 .CarregarProjetosAsync(_configuracao.PastaDocumentacoes)
                 .WaitAsync(cancellationToken);
 
-            var recuperadorContexto = new RecuperadorContexto();
-            var fabricaAgentes = new FabricaAgentes(_kernel, _projetos, _configuracao);
+            var fabricaAgentes = new FabricaAgentes(
+                _kernel,
+                _projetos,
+                _recuperadorContexto,
+                _configuracao);
 
             _orquestradorConsulta = new OrquestradorConsulta(
-                recuperadorContexto,
+                _recuperadorContexto,
                 fabricaAgentes,
                 _configuracao);
         }

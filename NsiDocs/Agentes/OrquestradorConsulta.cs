@@ -34,11 +34,23 @@ internal sealed class OrquestradorConsulta
             _configuracao.TimeoutPlanejador);
 
         var planoConsulta = InterpretarPlanoConsulta(respostaPlanejador);
-        var secoesRecuperadas = _recuperadorContexto.RecuperarSecoes(
-            _fabricaAgentes.ObterProjetos(),
-            planoConsulta,
-            pergunta,
-            _configuracao.QuantidadeSecoesRecuperadas);
+
+        List<SecaoDocumento> secoesRecuperadas;
+        try
+        {
+            secoesRecuperadas = await _fabricaAgentes.BuscarSecoesRelevantesComPluginAsync(
+                pergunta,
+                planoConsulta,
+                _configuracao.QuantidadeSecoesRecuperadas);
+        }
+        catch
+        {
+            secoesRecuperadas = _recuperadorContexto.RecuperarSecoes(
+                _fabricaAgentes.ObterProjetos(),
+                planoConsulta,
+                pergunta,
+                _configuracao.QuantidadeSecoesRecuperadas);
+        }
 
         var secoesUtilizadas = secoesRecuperadas
             .Take(_configuracao.QuantidadeSecoesUtilizadas)

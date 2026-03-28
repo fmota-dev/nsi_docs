@@ -13,6 +13,7 @@ builder.Services.Configure<FormOptions>(options =>
 builder.Services.AddSingleton(_ => ConfiguracaoAplicacao.Carregar());
 builder.Services.AddSingleton<ParserSecoesMarkdown>();
 builder.Services.AddSingleton<CarregadorDocumentacao>();
+builder.Services.AddSingleton<RecuperadorContexto>();
 builder.Services.AddSingleton(sp =>
 {
     var configuracao = sp.GetRequiredService<ConfiguracaoAplicacao>();
@@ -126,3 +127,5 @@ app.Run();
 internal sealed record PerguntaRequestDto(string Pergunta);
 
 internal sealed record ErroRespostaDto(string Mensagem);
+
+
