@@ -27,6 +27,12 @@ internal sealed class CarregadorDocumentacao(ParserSecoesMarkdown parserSecoesMa
                 .GetRelativePath(pastaDocumentacoes, arquivo)
                 .Replace('\\', '/');
             var secoes = parserSecoesMarkdown.ExtrairSecoes(arquivo, conteudo);
+            foreach (var secao in secoes)
+            {
+                secao.ProjetoNormalizado = RecuperadorContexto.NormalizarTextoBusca(secao.Projeto);
+                secao.TituloNormalizado = RecuperadorContexto.NormalizarTextoBusca(secao.Titulo);
+                secao.ConteudoNormalizado = RecuperadorContexto.NormalizarTextoBusca(secao.Conteudo);
+            }
 
             projetos.Add(new ProjetoDocumentacao
             {

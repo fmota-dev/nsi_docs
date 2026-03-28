@@ -1,8 +1,8 @@
 using System.Text;
 using System.Text.RegularExpressions;
-using AgentesFramework.Modelos;
+using NsiDocs.Modelos;
 
-namespace AgentesFramework.Servicos;
+namespace NsiDocs.Servicos;
 
 internal sealed class RecuperadorContexto
 {
@@ -17,12 +17,15 @@ internal sealed class RecuperadorContexto
         var projetoAlvo = planoConsulta.ProjetoAlvo.Equals("todos", StringComparison.OrdinalIgnoreCase)
             ? null
             : planoConsulta.ProjetoAlvo;
+        var projetoAlvoNormalizado = string.IsNullOrWhiteSpace(projetoAlvo)
+            ? null
+            : NormalizarTextoBusca(projetoAlvo);
 
         return secoes
             .Select(secao => new
             {
                 Secao = secao,
-                Score = CalcularScore(secao, termos, projetoAlvo)
+                Score = CalcularScore(secao, termos, projetoAlvoNormalizado)
             })
             .Where(item => item.Score > 0)
             .OrderByDescending(item => item.Score)
@@ -49,15 +52,15 @@ internal sealed class RecuperadorContexto
         return sb.ToString();
     }
 
-    private static int CalcularScore(SecaoDocumento secao, HashSet<string> termos, string? projetoAlvo)
+    private static int CalcularScore(SecaoDocumento secao, HashSet<string> termos, string? projetoAlvoNormalizado)
     {
         var score = 0;
-        var projeto = Normalizar(secao.Projeto);
-        var titulo = Normalizar(secao.Titulo);
-        var conteudo = Normalizar(secao.Conteudo);
+        var projeto = ObterTextoNormalizado(secao.ProjetoNormalizado, secao.Projeto);
+        var titulo = ObterTextoNormalizado(secao.TituloNormalizado, secao.Titulo);
+        var conteudo = ObterTextoNormalizado(secao.ConteudoNormalizado, secao.Conteudo);
 
-        if (!string.IsNullOrWhiteSpace(projetoAlvo) &&
-            projeto.Contains(Normalizar(projetoAlvo), StringComparison.OrdinalIgnoreCase))
+        if (!string.IsNullOrWhiteSpace(projetoAlvoNormalizado) &&
+            projeto.Contains(projetoAlvoNormalizado, StringComparison.OrdinalIgnoreCase))
         {
             score += 30;
         }
@@ -127,13 +130,13 @@ internal sealed class RecuperadorContexto
             "projeto", "interno", "nsi", "senac", "rn"
         };
 
-        return Regex.Matches(Normalizar(texto), @"[a-z0-9\-_]{2,}")
+        return Regex.Matches(NormalizarTextoBusca(texto), @"[a-z0-9\-_]{2,}")
             .Select(match => match.Value)
             .Where(termo => !stopwords.Contains(termo))
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
     }
 
-    private static string Normalizar(string texto)
+    internal static string NormalizarTextoBusca(string texto)
     {
         return texto
             .ToLowerInvariant()
@@ -149,5 +152,12 @@ internal sealed class RecuperadorContexto
             .Replace("õ", "o")
             .Replace("ú", "u")
             .Replace("ç", "c");
+    }
+
+    private static string ObterTextoNormalizado(string textoNormalizado, string textoOriginal)
+    {
+        return string.IsNullOrWhiteSpace(textoNormalizado)
+            ? NormalizarTextoBusca(textoOriginal)
+            : textoNormalizado;
     }
 }
