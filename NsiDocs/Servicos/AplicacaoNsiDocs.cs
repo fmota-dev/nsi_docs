@@ -1,10 +1,10 @@
 using System.Text;
-using AgentesFramework.Agentes;
-using AgentesFramework.Configuracoes;
-using AgentesFramework.Modelos;
 using Microsoft.SemanticKernel;
+using NsiDocs.Agentes;
+using NsiDocs.Configuracoes;
+using NsiDocs.Modelos;
 
-namespace AgentesFramework.Servicos;
+namespace NsiDocs.Servicos;
 
 internal sealed class AplicacaoNsiDocs
 {
@@ -14,7 +14,6 @@ internal sealed class AplicacaoNsiDocs
     private readonly Kernel _kernel;
     private readonly SemaphoreSlim _semaforo = new(1, 1);
     private List<ProjetoDocumentacao> _projetos = [];
-    private OrquestradorConsulta? _orquestradorConsulta;
 
     public AplicacaoNsiDocs(
         ConfiguracaoAplicacao configuracao,
@@ -61,7 +60,9 @@ internal sealed class AplicacaoNsiDocs
         {
             return _projetos
                 .OrderBy(projeto => projeto.Nome)
+                .ThenBy(projeto => projeto.Identificador)
                 .Select(projeto => new DocumentoDto(
+                    projeto.Identificador,
                     projeto.Nome,
                     projeto.Arquivo,
                     projeto.Secoes.Count))
@@ -73,7 +74,10 @@ internal sealed class AplicacaoNsiDocs
         }
     }
 
-    public async Task<RespostaChatDto> PerguntarAsync(string pergunta, CancellationToken cancellationToken = default)
+    public async Task<RespostaChatDto> PerguntarAsync(
+        string pergunta,
+        IReadOnlyList<string>? documentosSelecionados = null,
+        CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(pergunta))
         {
@@ -83,12 +87,15 @@ internal sealed class AplicacaoNsiDocs
         await _semaforo.WaitAsync(cancellationToken);
         try
         {
-            if (_orquestradorConsulta is null)
+            var projetosConsulta = FiltrarProjetosSelecionados(documentosSelecionados);
+            if (projetosConsulta.Count == 0)
             {
-                throw new InvalidOperationException("A aplicacao ainda nao foi inicializada.");
+                throw new InvalidOperationException("Nenhum documento selecionado e valido para a consulta.");
             }
 
-            var resultado = await _orquestradorConsulta.ProcessarAsync(pergunta).WaitAsync(cancellationToken);
+            var orquestradorConsulta = CriarOrquestradorConsulta(projetosConsulta);
+
+            var resultado = await orquestradorConsulta.ProcessarAsync(pergunta).WaitAsync(cancellationToken);
 
             return new RespostaChatDto(
                 resultado.RespostaFinal,
@@ -137,17 +144,6 @@ internal sealed class AplicacaoNsiDocs
             _projetos = await _carregadorDocumentacao
                 .CarregarProjetosAsync(_configuracao.PastaDocumentacoes)
                 .WaitAsync(cancellationToken);
-
-            var fabricaAgentes = new FabricaAgentes(
-                _kernel,
-                _projetos,
-                _recuperadorContexto,
-                _configuracao);
-
-            _orquestradorConsulta = new OrquestradorConsulta(
-                _recuperadorContexto,
-                fabricaAgentes,
-                _configuracao);
         }
         finally
         {
@@ -194,11 +190,52 @@ internal sealed class AplicacaoNsiDocs
 
         return sb.ToString();
     }
+
+    private OrquestradorConsulta CriarOrquestradorConsulta(List<ProjetoDocumentacao> projetos)
+    {
+        var fabricaAgentes = new FabricaAgentes(
+            _kernel,
+            projetos,
+            _recuperadorContexto,
+            _configuracao);
+
+        return new OrquestradorConsulta(
+            _recuperadorContexto,
+            fabricaAgentes,
+            _configuracao);
+    }
+
+    private List<ProjetoDocumentacao> FiltrarProjetosSelecionados(IReadOnlyList<string>? documentosSelecionados)
+    {
+        if (documentosSelecionados is null || documentosSelecionados.Count == 0)
+        {
+            return _projetos;
+        }
+
+        var identificadores = documentosSelecionados
+            .Select(NormalizarIdentificadorDocumento)
+            .Where(identificador => !string.IsNullOrWhiteSpace(identificador))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        if (identificadores.Count == 0)
+        {
+            return _projetos;
+        }
+
+        return _projetos
+            .Where(projeto => identificadores.Contains(projeto.Identificador))
+            .ToList();
+    }
+
+    private static string NormalizarIdentificadorDocumento(string identificador)
+    {
+        return identificador.Trim().Replace('\\', '/');
+    }
 }
 
 internal sealed record StatusAplicacaoDto(string Modelo, int QuantidadeProjetos, int QuantidadeSecoes);
 
-internal sealed record DocumentoDto(string Nome, string Arquivo, int QuantidadeSecoes);
+internal sealed record DocumentoDto(string Identificador, string Nome, string Arquivo, int QuantidadeSecoes);
 
 internal sealed record DocumentoUploadResultadoDto(string Arquivo, string Mensagem);
 

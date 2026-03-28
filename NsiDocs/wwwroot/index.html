@@ -259,6 +259,40 @@
             text-transform: uppercase;
         }
 
+        .section-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            margin-bottom: 12px;
+        }
+
+        .section-head .section-title {
+            margin: 0;
+        }
+
+        .section-actions {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .text-btn {
+            border: 0;
+            padding: 0;
+            background: transparent;
+            color: var(--text-soft);
+            cursor: pointer;
+            font-family: "IBM Plex Mono", monospace;
+            font-size: 0.76rem;
+            text-transform: lowercase;
+        }
+
+        .text-btn:hover {
+            color: var(--accent);
+        }
+
         .stats {
             display: grid;
             grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -390,6 +424,39 @@
             margin-bottom: 6px;
             font-size: 0.9rem;
             line-height: 1.45;
+        }
+
+        .doc-select {
+            display: grid;
+            grid-template-columns: auto minmax(0, 1fr);
+            gap: 10px;
+            align-items: start;
+            cursor: pointer;
+        }
+
+        .doc-select.selected {
+            border-color: rgba(45, 74, 63, 0.28);
+            background: linear-gradient(180deg, rgba(234, 243, 237, 0.96), rgba(247, 241, 231, 0.98));
+            box-shadow: 0 8px 16px rgba(45, 74, 63, 0.06);
+        }
+
+        .doc-select strong {
+            margin-bottom: 0;
+        }
+
+        .doc-checkbox {
+            margin: 4px 0 0;
+            width: 16px;
+            height: 16px;
+            accent-color: var(--accent);
+            cursor: pointer;
+        }
+
+        .doc-meta {
+            min-width: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
         }
 
         .history-preview {
@@ -875,7 +942,8 @@
             .topbar,
             .composer-grid,
             .toolbar,
-            .composer-footer {
+            .composer-footer,
+            .section-head {
                 flex-direction: column;
                 align-items: stretch;
             }
@@ -1100,7 +1168,13 @@
 
         <aside class="shell sidebar rightbar">
             <section class="box">
-                <div class="section-title">docs <span id="contador-docs" class="tiny"></span></div>
+                <div class="section-head">
+                    <div class="section-title">docs <span id="contador-docs" class="tiny"></span></div>
+                    <div class="section-actions">
+                        <button id="botao-marcar-todos-docs" type="button" class="text-btn">todos</button>
+                        <button id="botao-limpar-docs" type="button" class="text-btn">limpar</button>
+                    </div>
+                </div>
                 <div id="lista-documentos" class="stack scroll">
                     <div class="helper">carregando...</div>
                 </div>
@@ -1129,6 +1203,8 @@
             contadorHistorico: document.getElementById("contador-historico"),
             listaDocumentos: document.getElementById("lista-documentos"),
             listaHistorico: document.getElementById("lista-historico"),
+            botaoMarcarTodosDocs: document.getElementById("botao-marcar-todos-docs"),
+            botaoLimparDocs: document.getElementById("botao-limpar-docs"),
             mensagens: document.getElementById("mensagens"),
             mensagemChat: document.getElementById("mensagem-chat"),
             mensagemUpload: document.getElementById("mensagem-upload"),
@@ -1149,6 +1225,9 @@
         };
 
         const chaveHistorico = "nsi-docs-historico";
+        const chaveDocumentosSelecionados = "nsi-docs-documentos-selecionados";
+        let documentosCarregados = [];
+        let documentosSelecionados = new Set();
         let mensagemPendente = null;
         let conectado = navigator.onLine;
         let carregandoPergunta = false;
@@ -1343,6 +1422,78 @@
             return `${valor} ${valor === 1 ? singular : plural}`;
         }
 
+        function normalizarIdentificadorDocumento(identificador = "") {
+            return identificador.trim().replaceAll("\\", "/");
+        }
+
+        function obterSelecaoDocumentosSalva() {
+            try {
+                const valor = localStorage.getItem(chaveDocumentosSelecionados);
+                if (valor === null) {
+                    return null;
+                }
+
+                const itens = JSON.parse(valor);
+                if (!Array.isArray(itens)) {
+                    return null;
+                }
+
+                return itens
+                    .map(item => normalizarIdentificadorDocumento(String(item)))
+                    .filter(Boolean);
+            } catch {
+                return null;
+            }
+        }
+
+        function salvarSelecaoDocumentos() {
+            localStorage.setItem(
+                chaveDocumentosSelecionados,
+                JSON.stringify(Array.from(documentosSelecionados))
+            );
+        }
+
+        function obterDocumentosSelecionadosValidos() {
+            return documentosCarregados
+                .map(documento => normalizarIdentificadorDocumento(documento.identificador || ""))
+                .filter(identificador => documentosSelecionados.has(identificador));
+        }
+
+        function atualizarContadorDocumentos() {
+            const total = documentosCarregados.length;
+            if (!total) {
+                elementos.contadorDocs.textContent = "";
+                return;
+            }
+
+            elementos.contadorDocs.textContent = `[${documentosSelecionados.size}/${total}]`;
+        }
+
+        function reconciliarSelecaoDocumentos(documentos) {
+            const idsDisponiveis = documentos
+                .map(documento => normalizarIdentificadorDocumento(documento.identificador || ""))
+                .filter(Boolean);
+
+            const idsSalvos = obterSelecaoDocumentosSalva();
+            const idsDisponiveisSet = new Set(idsDisponiveis);
+
+            if (!idsDisponiveis.length) {
+                documentosSelecionados = new Set();
+                salvarSelecaoDocumentos();
+                return;
+            }
+
+            if (!idsSalvos?.length) {
+                documentosSelecionados = new Set(idsDisponiveis);
+                salvarSelecaoDocumentos();
+                return;
+            }
+
+            const idsValidos = idsSalvos.filter(identificador => idsDisponiveisSet.has(identificador));
+            documentosSelecionados = new Set(idsValidos.length ? idsValidos : idsDisponiveis);
+            salvarSelecaoDocumentos();
+        }
+
         function atualizarContadorCaracteres() {
             const quantidade = elementos.pergunta.value.length;
             elementos.contadorCaracteres.textContent = formatarContagem(quantidade, "caractere", "caracteres");
@@ -1509,6 +1660,35 @@
             `).join("");
         }
 
+        function renderizarDocumentos() {
+            atualizarContadorDocumentos();
+
+            if (!documentosCarregados.length) {
+                elementos.listaDocumentos.innerHTML = '<div class="helper">nenhum documento</div>';
+                return;
+            }
+
+            elementos.listaDocumentos.innerHTML = documentosCarregados.map(documento => {
+                const identificador = normalizarIdentificadorDocumento(documento.identificador || "");
+                const selecionado = documentosSelecionados.has(identificador);
+
+                return `
+                    <label class="doc-item doc-select${selecionado ? " selected" : ""}">
+                        <input
+                            type="checkbox"
+                            class="doc-checkbox"
+                            data-identificador="${escaparHtml(identificador)}"
+                            ${selecionado ? "checked" : ""}>
+                        <div class="doc-meta">
+                            <strong>${escaparHtml(documento.nome)}</strong>
+                            <div class="tiny">${escaparHtml(documento.arquivo)}</div>
+                            <div class="tiny">${documento.quantidadeSecoes} seção(ões)</div>
+                        </div>
+                    </label>
+                `;
+            }).join("");
+        }
+
         async function carregarStatus() {
             const resposta = await fetch("/api/status");
             const status = await resposta.json();
@@ -1524,21 +1704,9 @@
         async function carregarDocumentos() {
             const resposta = await fetch("/api/documentos");
             const documentos = await resposta.json();
-
-            elementos.contadorDocs.textContent = documentos.length ? `[${documentos.length}]` : "";
-
-            if (!documentos.length) {
-                elementos.listaDocumentos.innerHTML = '<div class="helper">nenhum documento</div>';
-                return;
-            }
-
-            elementos.listaDocumentos.innerHTML = documentos.map(documento => `
-                <article class="doc-item">
-                    <strong>${escaparHtml(documento.nome)}</strong>
-                    <div class="tiny">${escaparHtml(documento.arquivo)}</div>
-                    <div class="tiny" style="margin-top: 6px;">${documento.quantidadeSecoes} seção(ões)</div>
-                </article>
-            `).join("");
+            documentosCarregados = documentos;
+            reconciliarSelecaoDocumentos(documentosCarregados);
+            renderizarDocumentos();
         }
 
         function atualizarNomeArquivo() {
@@ -1573,10 +1741,16 @@
         elementos.formChat.addEventListener("submit", async evento => {
             evento.preventDefault();
             const pergunta = elementos.pergunta.value.trim();
+            const documentosSelecionadosAtuais = obterDocumentosSelecionadosValidos();
 
             if (!pergunta) {
                 aviso(elementos.mensagemChat, "digite uma pergunta", "error");
                 elementos.pergunta.focus();
+                return;
+            }
+
+            if (!documentosSelecionadosAtuais.length) {
+                aviso(elementos.mensagemChat, "selecione ao menos um documento para consultar", "error");
                 return;
             }
 
@@ -1597,7 +1771,10 @@
                     headers: {
                         "Content-Type": "application/json"
                     },
-                    body: JSON.stringify({ pergunta })
+                    body: JSON.stringify({
+                        pergunta,
+                        documentosSelecionados: documentosSelecionadosAtuais
+                    })
                 });
 
                 if (resposta.status === 408) {
@@ -1705,6 +1882,49 @@
             atualizarContadorCaracteres();
             ajustarAlturaTextarea();
             elementos.pergunta.focus();
+        });
+
+        elementos.botaoMarcarTodosDocs.addEventListener("click", () => {
+            documentosSelecionados = new Set(
+                documentosCarregados
+                    .map(documento => normalizarIdentificadorDocumento(documento.identificador || ""))
+                    .filter(Boolean)
+            );
+            salvarSelecaoDocumentos();
+            renderizarDocumentos();
+            aviso(elementos.mensagemChat, "");
+        });
+
+        elementos.botaoLimparDocs.addEventListener("click", () => {
+            documentosSelecionados = new Set();
+            salvarSelecaoDocumentos();
+            renderizarDocumentos();
+            aviso(elementos.mensagemChat, "selecione ao menos um documento antes de perguntar", "error");
+        });
+
+        elementos.listaDocumentos.addEventListener("change", evento => {
+            const checkbox = evento.target.closest("[data-identificador]");
+            if (!checkbox) {
+                return;
+            }
+
+            const identificador = normalizarIdentificadorDocumento(checkbox.dataset.identificador || "");
+            if (!identificador) {
+                return;
+            }
+
+            if (checkbox.checked) {
+                documentosSelecionados.add(identificador);
+            } else {
+                documentosSelecionados.delete(identificador);
+            }
+
+            salvarSelecaoDocumentos();
+            renderizarDocumentos();
+
+            if (documentosSelecionados.size) {
+                aviso(elementos.mensagemChat, "");
+            }
         });
 
         elementos.listaHistorico.addEventListener("click", evento => {

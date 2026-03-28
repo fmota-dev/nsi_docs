@@ -1,7 +1,8 @@
-using AgentesFramework.Configuracoes;
-using AgentesFramework.Servicos;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.SemanticKernel;
+using NsiDocs;
+using NsiDocs.Configuracoes;
+using NsiDocs.Servicos;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -106,7 +107,10 @@ app.MapPost("/api/chat/perguntar", async (PerguntaRequestDto request, AplicacaoN
 
     try
     {
-        var resposta = await aplicacao.PerguntarAsync(request.Pergunta.Trim(), cancellationToken);
+        var resposta = await aplicacao.PerguntarAsync(
+            request.Pergunta.Trim(),
+            request.DocumentosSelecionados,
+            cancellationToken);
         return Results.Ok(resposta);
     }
     catch (OperationCanceledException)
@@ -124,8 +128,9 @@ await aplicacaoNsiDocs.InicializarAsync();
 
 app.Run();
 
-internal sealed record PerguntaRequestDto(string Pergunta);
+namespace NsiDocs
+{
+    internal sealed record PerguntaRequestDto(string Pergunta, IReadOnlyList<string>? DocumentosSelecionados);
 
-internal sealed record ErroRespostaDto(string Mensagem);
-
-
+    internal sealed record ErroRespostaDto(string Mensagem);
+}

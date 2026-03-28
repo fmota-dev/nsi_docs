@@ -1,6 +1,6 @@
-using AgentesFramework.Modelos;
+using NsiDocs.Modelos;
 
-namespace AgentesFramework.Servicos;
+namespace NsiDocs.Servicos;
 
 internal sealed class CarregadorDocumentacao(ParserSecoesMarkdown parserSecoesMarkdown)
 {
@@ -23,10 +23,14 @@ internal sealed class CarregadorDocumentacao(ParserSecoesMarkdown parserSecoesMa
             }
 
             var nomeProjeto = Path.GetFileNameWithoutExtension(arquivo);
+            var identificador = Path
+                .GetRelativePath(pastaDocumentacoes, arquivo)
+                .Replace('\\', '/');
             var secoes = parserSecoesMarkdown.ExtrairSecoes(arquivo, conteudo);
 
             projetos.Add(new ProjetoDocumentacao
             {
+                Identificador = identificador,
                 Nome = nomeProjeto,
                 Arquivo = Path.GetFileName(arquivo),
                 Secoes = secoes
