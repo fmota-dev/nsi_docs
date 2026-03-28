@@ -278,6 +278,51 @@
             flex-wrap: wrap;
         }
 
+        .docs-toolbar {
+            display: grid;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+
+        .filter-field {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .filter-input {
+            width: 100%;
+            min-width: 0;
+            border: 1px solid var(--line);
+            border-radius: 12px;
+            padding: 10px 12px;
+            background: rgba(255, 252, 246, 0.94);
+            color: var(--text);
+            font-family: "IBM Plex Mono", monospace;
+            font-size: 0.8rem;
+            line-height: 1.4;
+        }
+
+        .filter-input:hover {
+            border-color: var(--line-strong);
+        }
+
+        .filter-input:focus {
+            outline: none;
+            border-color: rgba(45, 74, 63, 0.3);
+            box-shadow: 0 0 0 4px rgba(45, 74, 63, 0.08);
+        }
+
+        .filter-input::placeholder {
+            color: var(--text-faint);
+        }
+
+        .btn.compact {
+            min-width: 44px;
+            padding: 10px 12px;
+        }
+
         .text-btn {
             border: 0;
             padding: 0;
@@ -970,6 +1015,10 @@
                 width: 100%;
             }
 
+            .filter-field {
+                grid-template-columns: 1fr auto;
+            }
+
             .stats {
                 grid-template-columns: 1fr;
             }
@@ -1175,6 +1224,18 @@
                         <button id="botao-limpar-docs" type="button" class="text-btn">limpar</button>
                     </div>
                 </div>
+                <div class="docs-toolbar">
+                    <div class="filter-field">
+                        <input
+                            id="filtro-documentos"
+                            class="filter-input"
+                            type="search"
+                            placeholder="filtrar docs..."
+                            autocomplete="off"
+                            spellcheck="false">
+                        <button id="botao-limpar-filtro-docs" type="button" class="btn compact" aria-label="Limpar filtro de documentos">x</button>
+                    </div>
+                </div>
                 <div id="lista-documentos" class="stack scroll">
                     <div class="helper">carregando...</div>
                 </div>
@@ -1205,6 +1266,8 @@
             listaHistorico: document.getElementById("lista-historico"),
             botaoMarcarTodosDocs: document.getElementById("botao-marcar-todos-docs"),
             botaoLimparDocs: document.getElementById("botao-limpar-docs"),
+            filtroDocumentos: document.getElementById("filtro-documentos"),
+            botaoLimparFiltroDocs: document.getElementById("botao-limpar-filtro-docs"),
             mensagens: document.getElementById("mensagens"),
             mensagemChat: document.getElementById("mensagem-chat"),
             mensagemUpload: document.getElementById("mensagem-upload"),
@@ -1228,6 +1291,7 @@
         const chaveDocumentosSelecionados = "nsi-docs-documentos-selecionados";
         let documentosCarregados = [];
         let documentosSelecionados = new Set();
+        let filtroDocumentos = "";
         let mensagemPendente = null;
         let conectado = navigator.onLine;
         let carregandoPergunta = false;
@@ -1426,6 +1490,14 @@
             return identificador.trim().replaceAll("\\", "/");
         }
 
+        function normalizarTextoFiltro(texto = "") {
+            return texto
+                .normalize("NFD")
+                .replace(/[\u0300-\u036f]/g, "")
+                .toLowerCase()
+                .trim();
+        }
+
         function obterSelecaoDocumentosSalva() {
             try {
                 const valor = localStorage.getItem(chaveDocumentosSelecionados);
@@ -1459,6 +1531,25 @@
                 .filter(identificador => documentosSelecionados.has(identificador));
         }
 
+        function obterDocumentosFiltrados() {
+            const termo = normalizarTextoFiltro(filtroDocumentos);
+            if (!termo) {
+                return documentosCarregados;
+            }
+
+            return documentosCarregados.filter(documento => {
+                const alvo = [
+                    documento.nome || "",
+                    documento.arquivo || "",
+                    documento.identificador || ""
+                ]
+                    .map(normalizarTextoFiltro)
+                    .join(" ");
+
+                return alvo.includes(termo);
+            });
+        }
+
         function atualizarContadorDocumentos() {
             const total = documentosCarregados.length;
             if (!total) {
@@ -1466,7 +1557,16 @@
                 return;
             }
 
-            elementos.contadorDocs.textContent = `[${documentosSelecionados.size}/${total}]`;
+            const documentosVisiveis = obterDocumentosFiltrados();
+            const contadorBase = `[${documentosSelecionados.size}/${total}]`;
+
+            elementos.contadorDocs.textContent = filtroDocumentos.trim() && documentosVisiveis.length !== total
+                ? `${contadorBase} · ${documentosVisiveis.length}`
+                : contadorBase;
+        }
+
+        function atualizarEstadoFiltroDocumentos() {
+            elementos.botaoLimparFiltroDocs.disabled = !filtroDocumentos.trim();
         }
 
         function reconciliarSelecaoDocumentos(documentos) {
@@ -1662,13 +1762,20 @@
 
         function renderizarDocumentos() {
             atualizarContadorDocumentos();
+            atualizarEstadoFiltroDocumentos();
 
             if (!documentosCarregados.length) {
                 elementos.listaDocumentos.innerHTML = '<div class="helper">nenhum documento</div>';
                 return;
             }
 
-            elementos.listaDocumentos.innerHTML = documentosCarregados.map(documento => {
+            const documentosVisiveis = obterDocumentosFiltrados();
+            if (!documentosVisiveis.length) {
+                elementos.listaDocumentos.innerHTML = '<div class="helper">nenhum documento encontrado para o filtro</div>';
+                return;
+            }
+
+            elementos.listaDocumentos.innerHTML = documentosVisiveis.map(documento => {
                 const identificador = normalizarIdentificadorDocumento(documento.identificador || "");
                 const selecionado = documentosSelecionados.has(identificador);
 
@@ -1885,21 +1992,69 @@
         });
 
         elementos.botaoMarcarTodosDocs.addEventListener("click", () => {
-            documentosSelecionados = new Set(
-                documentosCarregados
-                    .map(documento => normalizarIdentificadorDocumento(documento.identificador || ""))
-                    .filter(Boolean)
-            );
+            const documentosAlvo = obterDocumentosFiltrados();
+            const novosSelecionados = new Set(documentosSelecionados);
+
+            documentosAlvo
+                .map(documento => normalizarIdentificadorDocumento(documento.identificador || ""))
+                .filter(Boolean)
+                .forEach(identificador => novosSelecionados.add(identificador));
+
+            documentosSelecionados = novosSelecionados;
             salvarSelecaoDocumentos();
             renderizarDocumentos();
             aviso(elementos.mensagemChat, "");
         });
 
         elementos.botaoLimparDocs.addEventListener("click", () => {
-            documentosSelecionados = new Set();
+            const documentosAlvo = obterDocumentosFiltrados()
+                .map(documento => normalizarIdentificadorDocumento(documento.identificador || ""))
+                .filter(Boolean);
+
+            if (!documentosAlvo.length) {
+                return;
+            }
+
+            const novosSelecionados = new Set(documentosSelecionados);
+            documentosAlvo.forEach(identificador => novosSelecionados.delete(identificador));
+            documentosSelecionados = novosSelecionados;
             salvarSelecaoDocumentos();
             renderizarDocumentos();
-            aviso(elementos.mensagemChat, "selecione ao menos um documento antes de perguntar", "error");
+
+            if (!documentosSelecionados.size) {
+                aviso(elementos.mensagemChat, "selecione ao menos um documento antes de perguntar", "error");
+            }
+        });
+
+        elementos.filtroDocumentos.addEventListener("input", evento => {
+            filtroDocumentos = evento.target.value;
+            renderizarDocumentos();
+        });
+
+        elementos.filtroDocumentos.addEventListener("keydown", evento => {
+            if (evento.key !== "Escape") {
+                return;
+            }
+
+            if (!filtroDocumentos.trim()) {
+                return;
+            }
+
+            evento.preventDefault();
+            filtroDocumentos = "";
+            elementos.filtroDocumentos.value = "";
+            renderizarDocumentos();
+        });
+
+        elementos.botaoLimparFiltroDocs.addEventListener("click", () => {
+            if (!filtroDocumentos.trim()) {
+                return;
+            }
+
+            filtroDocumentos = "";
+            elementos.filtroDocumentos.value = "";
+            renderizarDocumentos();
+            elementos.filtroDocumentos.focus();
         });
 
         elementos.listaDocumentos.addEventListener("change", evento => {

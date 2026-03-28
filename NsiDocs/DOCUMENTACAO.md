@@ -736,8 +736,11 @@ Pontos relevantes:
 - mantem historico local em `localStorage`
 - mantem a selecao atual de documentos em `localStorage`
 - permite marcar todos ou limpar a selecao no painel `docs`
+- permite filtrar a lista de documentos por nome, arquivo ou identificador diretamente no painel `docs`
 - envia upload de `.md`
 - funciona como PWA com shell offline
+
+Com filtro ativo no painel `docs`, as acoes `todos` e `limpar` passam a atuar sobre os documentos visiveis naquele recorte.
 
 Arquivos relacionados:
 
