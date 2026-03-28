@@ -110,6 +110,12 @@ internal sealed class FabricaAgentes
                            Voce formata a resposta final para console.
                            Regras:
                            - Use markdown simples.
+                           - Prefira titulos curtos e listas para facilitar leitura.
+                           - Se houver diagrama ASCII (com +, |, ->), envolva obrigatoriamente em bloco:
+                             ```text
+                             ...
+                             ```
+                           - Nunca escreva pseudo-tabela com pipes fora de bloco de codigo.
                            - Preserve o conteudo tecnico.
                            - Remova repeticoes.
                            - Nao adicione informacoes novas.

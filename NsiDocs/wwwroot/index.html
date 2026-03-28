@@ -1222,9 +1222,101 @@
                 .replaceAll("'", "&#039;");
         }
 
+        function ehLinhaAsciiPossivel(linha = "") {
+            const texto = linha.trim();
+            if (!texto) {
+                return false;
+            }
+
+            if (/^(```|~~~)/.test(texto) || /^#{1,6}\s/.test(texto) || /^[-*]\s+/.test(texto) || /^\d+\.\s+/.test(texto)) {
+                return false;
+            }
+
+            return /[|+^v<>]/.test(texto) || /^\s*[-=]{4,}\s*$/.test(texto);
+        }
+
+        function ehLinhaBordaAscii(linha = "") {
+            return /^\s*\+[-=+| ]{3,}\+\s*$/.test(linha);
+        }
+
+        function ehLinhaConectorAscii(linha = "") {
+            return /^\s*[\-+|^v<> ]{4,}\s*$/.test(linha.trim());
+        }
+
+        function protegerDiagramasAsciiNoMarkdown(markdown = "") {
+            const linhas = markdown.split(/\r?\n/);
+            const quantidadeBordasAscii = linhas.filter(ehLinhaBordaAscii).length;
+            if (quantidadeBordasAscii >= 2 && !/^\s*(```|~~~)/m.test(markdown)) {
+                return `\`\`\`text\n${markdown}\n\`\`\``;
+            }
+
+            const resultado = [];
+            let emBlocoCodigo = false;
+
+            for (let i = 0; i < linhas.length; ) {
+                const linhaAtual = linhas[i];
+                const textoAtual = linhaAtual.trim();
+
+                if (/^(```|~~~)/.test(textoAtual)) {
+                    emBlocoCodigo = !emBlocoCodigo;
+                    resultado.push(linhaAtual);
+                    i++;
+                    continue;
+                }
+
+                if (emBlocoCodigo || !ehLinhaAsciiPossivel(linhaAtual)) {
+                    resultado.push(linhaAtual);
+                    i++;
+                    continue;
+                }
+
+                const bloco = [];
+                let temBorda = false;
+                let temConector = false;
+
+                while (i < linhas.length) {
+                    const linhaBloco = linhas[i];
+                    if (!linhaBloco.trim()) {
+                        bloco.push(linhaBloco);
+                        i++;
+                        continue;
+                    }
+
+                    if (!ehLinhaAsciiPossivel(linhaBloco)) {
+                        break;
+                    }
+
+                    if (ehLinhaBordaAscii(linhaBloco)) {
+                        temBorda = true;
+                    }
+
+                    if (ehLinhaConectorAscii(linhaBloco)) {
+                        temConector = true;
+                    }
+
+                    bloco.push(linhaBloco);
+                    i++;
+                }
+
+                const linhasComConteudo = bloco.filter(linha => linha.trim().length > 0).length;
+                if ((temBorda || temConector) && linhasComConteudo >= 3) {
+                    resultado.push("```text");
+                    resultado.push(...bloco);
+                    resultado.push("```");
+                    continue;
+                }
+
+                resultado.push(...bloco);
+            }
+
+            return resultado.join("\n");
+        }
+
         function renderizarMarkdownSeguro(markdown = "") {
+            const markdownNormalizado = protegerDiagramasAsciiNoMarkdown(markdown);
+
             if (!window.marked || !window.DOMPurify) {
-                return `<p>${escaparHtml(markdown).replace(/\n/g, "<br>")}</p>`;
+                return `<p>${escaparHtml(markdownNormalizado).replace(/\n/g, "<br>")}</p>`;
             }
 
             marked.setOptions({
@@ -1232,7 +1324,7 @@
                 breaks: true
             });
 
-            return DOMPurify.sanitize(marked.parse(markdown), {
+            return DOMPurify.sanitize(marked.parse(markdownNormalizado), {
                 USE_PROFILES: { html: true }
             });
         }
