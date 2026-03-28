@@ -1,13 +1,13 @@
 using System.Text;
 using System.Text.Json;
-using AgentesFramework.Configuracoes;
-using AgentesFramework.Modelos;
-using AgentesFramework.Plugins;
-using AgentesFramework.Servicos;
 using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.Agents;
+using NsiDocs.Configuracoes;
+using NsiDocs.Modelos;
+using NsiDocs.Plugins;
+using NsiDocs.Servicos;
 
-namespace AgentesFramework.Agentes;
+namespace NsiDocs.Agentes;
 
 internal sealed class FabricaAgentes
 {

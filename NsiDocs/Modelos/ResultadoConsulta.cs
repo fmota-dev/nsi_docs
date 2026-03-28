@@ -1,4 +1,4 @@
-namespace AgentesFramework.Modelos;
+namespace NsiDocs.Modelos;
 
 internal sealed class ResultadoConsulta
 {

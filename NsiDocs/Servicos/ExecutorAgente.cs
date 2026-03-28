@@ -1,6 +1,6 @@
 using Microsoft.SemanticKernel.Agents;
 
-namespace AgentesFramework.Servicos;
+namespace NsiDocs.Servicos;
 
 internal static class ExecutorAgente
 {

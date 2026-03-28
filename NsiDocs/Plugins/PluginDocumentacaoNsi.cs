@@ -1,11 +1,11 @@
 using System.ComponentModel;
 using System.Text;
 using System.Text.Json;
-using AgentesFramework.Modelos;
-using AgentesFramework.Servicos;
 using Microsoft.SemanticKernel;
+using NsiDocs.Modelos;
+using NsiDocs.Servicos;
 
-namespace AgentesFramework.Plugins;
+namespace NsiDocs.Plugins;
 
 internal sealed class PluginDocumentacaoNsi
 {

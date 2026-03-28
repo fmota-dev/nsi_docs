@@ -1,9 +1,9 @@
 using System.Text.RegularExpressions;
-using AgentesFramework.Configuracoes;
-using AgentesFramework.Modelos;
-using AgentesFramework.Servicos;
+using NsiDocs.Configuracoes;
+using NsiDocs.Modelos;
+using NsiDocs.Servicos;
 
-namespace AgentesFramework.Agentes;
+namespace NsiDocs.Agentes;
 
 internal sealed class OrquestradorConsulta
 {

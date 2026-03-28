@@ -1,7 +1,7 @@
 using System.Text.RegularExpressions;
-using AgentesFramework.Modelos;
+using NsiDocs.Modelos;
 
-namespace AgentesFramework.Servicos;
+namespace NsiDocs.Servicos;
 
 internal sealed class ParserSecoesMarkdown
 {

@@ -1,4 +1,4 @@
-namespace AgentesFramework.Configuracoes;
+namespace NsiDocs.Configuracoes;
 
 internal sealed class ConfiguracaoAplicacao
 {
