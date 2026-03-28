@@ -587,23 +587,6 @@
             padding: 18px;
         }
 
-        .empty-actions {
-            display: flex;
-            gap: 8px;
-            flex-wrap: wrap;
-            margin-top: 12px;
-        }
-
-        .quick {
-            border: 1px solid var(--line);
-            border-radius: 999px;
-            background: var(--panel-strong);
-            padding: 8px 12px;
-            cursor: pointer;
-            font-family: "IBM Plex Mono", monospace;
-            font-size: 0.76rem;
-        }
-
         .msg {
             display: flex;
             flex-direction: column;
@@ -1290,8 +1273,7 @@
             .btn,
             .shell,
             .offline-banner,
-            .install-cta,
-            .quick {
+            .install-cta {
                 transition: none !important;
             }
 
@@ -1922,13 +1904,8 @@
         function htmlEstadoVazio() {
             return `
                 <section class="empty">
-                    <div class="section-title" style="margin-bottom: 8px;">atalhos</div>
-                    <div class="helper">use uma das perguntas rápidas abaixo ou escreva a sua</div>
-                    <div class="empty-actions">
-                        <button type="button" class="quick" data-pergunta="Que stack é usada no projeto do carreiras?">stack / carreiras</button>
-                        <button type="button" class="quick" data-pergunta="Quais integrações existem no portal de estágios?">integrações / portal</button>
-                        <button type="button" class="quick" data-pergunta="Como funciona a segurança no CIPA?">segurança / cipa</button>
-                    </div>
+                    <div class="section-title" style="margin-bottom: 8px;">pronto para consultar</div>
+                    <div class="helper">escreva uma pergunta no campo abaixo para buscar trechos na documentação carregada</div>
                 </section>
             `;
         }
