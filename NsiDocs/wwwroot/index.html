@@ -767,6 +767,82 @@
             margin-top: 12px;
         }
 
+        .coverage {
+            margin-top: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .coverage-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 7px 10px;
+            border-radius: 999px;
+            border: 1px solid var(--line);
+            background: rgba(255, 252, 246, 0.96);
+            font-family: "IBM Plex Mono", monospace;
+            font-size: 0.74rem;
+            color: var(--text-soft);
+        }
+
+        .coverage-chip::before {
+            content: "";
+            width: 8px;
+            height: 8px;
+            border-radius: 999px;
+            background: rgba(45, 74, 63, 0.4);
+        }
+
+        .coverage-chip.alta {
+            border-color: rgba(47, 119, 87, 0.28);
+            background: rgba(232, 245, 237, 0.96);
+            color: #24563f;
+        }
+
+        .coverage-chip.alta::before {
+            background: var(--success);
+        }
+
+        .coverage-chip.media {
+            border-color: rgba(176, 97, 43, 0.32);
+            background: rgba(251, 242, 231, 0.98);
+            color: #8b5527;
+        }
+
+        .coverage-chip.media::before {
+            background: var(--amber);
+        }
+
+        .coverage-chip.baixa {
+            border-color: rgba(156, 62, 51, 0.3);
+            background: rgba(255, 245, 242, 0.98);
+            color: #8d382f;
+        }
+
+        .coverage-chip.baixa::before {
+            background: var(--danger);
+        }
+
+        .coverage-btn {
+            border: 1px solid var(--line);
+            border-radius: 999px;
+            background: rgba(255, 252, 246, 0.98);
+            padding: 8px 11px;
+            cursor: pointer;
+            color: var(--text-soft);
+            font-family: "IBM Plex Mono", monospace;
+            font-size: 0.74rem;
+        }
+
+        .coverage-btn:hover {
+            border-color: rgba(45, 74, 63, 0.28);
+            color: var(--accent);
+            background: rgba(234, 243, 237, 0.96);
+        }
+
         .followups {
             margin-top: 14px;
             display: grid;
@@ -960,6 +1036,81 @@
             animation: rise 160ms ease;
         }
 
+        .modal {
+            position: fixed;
+            inset: 0;
+            z-index: 160;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 18px;
+        }
+
+        .modal.visible {
+            display: flex;
+            animation: rise 160ms ease;
+        }
+
+        .modal-backdrop {
+            position: absolute;
+            inset: 0;
+            background: rgba(25, 20, 16, 0.38);
+            backdrop-filter: blur(2px);
+        }
+
+        .modal-card {
+            position: relative;
+            z-index: 1;
+            width: min(680px, calc(100vw - 24px));
+            max-height: min(84vh, 760px);
+            display: grid;
+            grid-template-rows: auto minmax(0, 1fr);
+            padding: 0;
+            overflow: hidden;
+        }
+
+        .modal-head {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 18px 18px 14px;
+            border-bottom: 1px solid rgba(60, 44, 26, 0.1);
+            background: rgba(255, 255, 255, 0.34);
+        }
+
+        .modal-body {
+            min-height: 0;
+            overflow: auto;
+            padding: 18px;
+            display: grid;
+            gap: 16px;
+        }
+
+        .modal-copy {
+            margin: 0;
+            color: var(--text-soft);
+            line-height: 1.7;
+        }
+
+        .modal-list {
+            margin: 0;
+            padding-left: 18px;
+            display: grid;
+            gap: 8px;
+            line-height: 1.65;
+        }
+
+        .modal-list li {
+            color: var(--text);
+        }
+
+        .modal-stack {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
         .scroll::-webkit-scrollbar,
         .sidebar::-webkit-scrollbar,
         textarea::-webkit-scrollbar {
@@ -1089,6 +1240,20 @@
                 width: calc(100vw - 18px);
                 top: 6px;
                 font-size: 0.76rem;
+            }
+
+            .modal {
+                padding: 10px;
+            }
+
+            .modal-card {
+                width: 100%;
+                max-height: calc(100vh - 20px);
+            }
+
+            .modal-head {
+                flex-direction: column;
+                align-items: stretch;
             }
 
             .install-cta {
@@ -1333,6 +1498,37 @@
         </aside>
     </div>
 
+    <div id="modal-cobertura" class="modal" aria-hidden="true">
+        <div class="modal-backdrop" data-fechar-modal="true"></div>
+        <div class="shell modal-card" role="dialog" aria-modal="true" aria-labelledby="titulo-modal-cobertura">
+            <div class="modal-head">
+                <div>
+                    <div id="titulo-modal-cobertura" class="brand-title">cobertura documental</div>
+                    <div id="subtitulo-modal-cobertura" class="helper mono"></div>
+                </div>
+                <button id="botao-fechar-modal-cobertura" type="button" class="btn">Fechar</button>
+            </div>
+            <div class="modal-body scroll">
+                <p id="mensagem-modal-cobertura" class="modal-copy"></p>
+
+                <section>
+                    <div class="section-title">motivos</div>
+                    <ul id="lista-detalhes-cobertura" class="modal-list"></ul>
+                </section>
+
+                <section>
+                    <div class="section-title">seções usadas</div>
+                    <div id="lista-secoes-cobertura" class="modal-stack"></div>
+                </section>
+
+                <section>
+                    <div class="section-title">como tentar melhor</div>
+                    <ul id="lista-sugestoes-cobertura" class="modal-list"></ul>
+                </section>
+            </div>
+        </div>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/dompurify@3.1.6/dist/purify.min.js"></script>
     <script>
@@ -1373,7 +1569,15 @@
             mensagemOllama: document.getElementById("mensagem-ollama"),
             limparChat: document.getElementById("limpar-chat"),
             avisoConectividade: document.getElementById("aviso-conectividade"),
-            botaoInstalarApp: document.getElementById("botao-instalar-app")
+            botaoInstalarApp: document.getElementById("botao-instalar-app"),
+            modalCobertura: document.getElementById("modal-cobertura"),
+            tituloModalCobertura: document.getElementById("titulo-modal-cobertura"),
+            subtituloModalCobertura: document.getElementById("subtitulo-modal-cobertura"),
+            mensagemModalCobertura: document.getElementById("mensagem-modal-cobertura"),
+            listaDetalhesCobertura: document.getElementById("lista-detalhes-cobertura"),
+            listaSecoesCobertura: document.getElementById("lista-secoes-cobertura"),
+            listaSugestoesCobertura: document.getElementById("lista-sugestoes-cobertura"),
+            botaoFecharModalCobertura: document.getElementById("botao-fechar-modal-cobertura")
         };
 
         const chaveHistorico = "nsi-docs-historico";
@@ -1387,6 +1591,8 @@
         let carregandoOllama = false;
         let carregandoUpload = false;
         let promptInstalacao = null;
+        let sequenciaCobertura = 0;
+        const coberturasPorId = new Map();
 
         function aviso(elemento, texto, tipo = "") {
             elemento.textContent = texto;
@@ -1729,7 +1935,10 @@
 
         function resetarConversa() {
             elementos.mensagens.innerHTML = htmlEstadoVazio();
+            coberturasPorId.clear();
+            sequenciaCobertura = 0;
             mensagemPendente = null;
+            fecharModalCobertura();
             aviso(elementos.mensagemChat, "");
         }
 
@@ -1750,6 +1959,50 @@
                     ${secoes.map(secao => `
                         <span class="context-chip">${escaparHtml(secao.projeto)} -> ${escaparHtml(secao.titulo)}</span>
                     `).join("")}
+                </div>
+            `;
+        }
+
+        function normalizarNivelCobertura(nivel = "") {
+            if (nivel === "media") {
+                return "media";
+            }
+
+            return nivel === "alta" ? "alta" : "baixa";
+        }
+
+        function rotuloNivelCobertura(nivel = "") {
+            return normalizarNivelCobertura(nivel) === "media" ? "média" : normalizarNivelCobertura(nivel);
+        }
+
+        function registrarCobertura(cobertura, secoes = []) {
+            const id = `cobertura-${++sequenciaCobertura}`;
+            coberturasPorId.set(id, {
+                ...cobertura,
+                secoes
+            });
+
+            return id;
+        }
+
+        function blocoCobertura(cobertura, secoes = []) {
+            if (!cobertura?.nivel) {
+                return "";
+            }
+
+            const nivel = normalizarNivelCobertura(cobertura.nivel);
+            const precisaDetalhes = nivel !== "alta";
+            const idCobertura = precisaDetalhes ? registrarCobertura(cobertura, secoes) : "";
+
+            return `
+                <div class="coverage">
+                    <span class="coverage-chip ${nivel}">cobertura: ${rotuloNivelCobertura(nivel)}</span>
+                    ${precisaDetalhes ? `
+                        <button
+                            type="button"
+                            class="coverage-btn"
+                            data-cobertura-id="${escaparHtml(idCobertura)}">ver detalhes</button>
+                    ` : ""}
                 </div>
             `;
         }
@@ -1777,6 +2030,49 @@
 
         function rolarFim() {
             elementos.mensagens.scrollTop = elementos.mensagens.scrollHeight;
+        }
+
+        function preencherListaModal(elemento, itens = []) {
+            if (!itens.length) {
+                elemento.innerHTML = '<li class="helper">sem detalhes adicionais</li>';
+                return;
+            }
+
+            elemento.innerHTML = itens.map(item => `<li>${escaparHtml(item)}</li>`).join("");
+        }
+
+        function preencherSecoesModal(secoes = []) {
+            if (!secoes.length) {
+                elementos.listaSecoesCobertura.innerHTML = '<div class="helper">nenhuma seção usada</div>';
+                return;
+            }
+
+            elementos.listaSecoesCobertura.innerHTML = secoes.map(secao => `
+                <span class="context-chip">${escaparHtml(secao.projeto)} -> ${escaparHtml(secao.titulo)}</span>
+            `).join("");
+        }
+
+        function fecharModalCobertura() {
+            elementos.modalCobertura.classList.remove("visible");
+            elementos.modalCobertura.setAttribute("aria-hidden", "true");
+        }
+
+        function abrirModalCobertura(idCobertura) {
+            const cobertura = coberturasPorId.get(idCobertura);
+            if (!cobertura) {
+                return;
+            }
+
+            const nivel = normalizarNivelCobertura(cobertura.nivel);
+            elementos.tituloModalCobertura.textContent = `cobertura documental ${rotuloNivelCobertura(nivel)}`;
+            elementos.subtituloModalCobertura.textContent = `aderência da busca: ${rotuloNivelCobertura(nivel)}`;
+            elementos.mensagemModalCobertura.textContent = cobertura.mensagem || "";
+            preencherListaModal(elementos.listaDetalhesCobertura, cobertura.detalhes || []);
+            preencherListaModal(elementos.listaSugestoesCobertura, cobertura.sugestoes || []);
+            preencherSecoesModal(cobertura.secoes || []);
+            elementos.modalCobertura.classList.add("visible");
+            elementos.modalCobertura.setAttribute("aria-hidden", "false");
+            elementos.botaoFecharModalCobertura.focus();
         }
 
         function adicionarMensagemUsuario(texto) {
@@ -1826,7 +2122,7 @@
             }
         }
 
-        function adicionarMensagemAssistente(markdown, secoes = [], erro = false, perguntasSugeridas = []) {
+        function adicionarMensagemAssistente(markdown, secoes = [], erro = false, perguntasSugeridas = [], cobertura = null) {
             removerEstadoVazio();
             removerMensagemPendente();
 
@@ -1841,6 +2137,7 @@
                 <div class="msg-body">
                     <div class="markdown">${renderizarMarkdownSeguro(markdown)}</div>
                     ${chipsContexto(secoes)}
+                    ${erro ? "" : blocoCobertura(cobertura, secoes)}
                     ${erro ? "" : botoesSugestoes(perguntasSugeridas)}
                 </div>
             `;
@@ -2050,7 +2347,8 @@
                     dados.resposta,
                     dados.secoesUtilizadas || [],
                     false,
-                    dados.perguntasSugeridas || []);
+                    dados.perguntasSugeridas || [],
+                    dados.cobertura || null);
                 salvarHistorico(pergunta, dados.resposta);
                 aviso(elementos.mensagemChat, "ok", "success");
             } catch (erro) {
@@ -2320,6 +2618,12 @@
         });
 
         elementos.mensagens.addEventListener("click", evento => {
+            const botaoCobertura = evento.target.closest("[data-cobertura-id]");
+            if (botaoCobertura) {
+                abrirModalCobertura(botaoCobertura.dataset.coberturaId || "");
+                return;
+            }
+
             const botao = evento.target.closest("[data-pergunta]");
             if (!botao) {
                 return;
@@ -2345,6 +2649,22 @@
             if (evento.key === "Enter" && !evento.shiftKey) {
                 evento.preventDefault();
                 elementos.formChat.requestSubmit();
+            }
+        });
+
+        elementos.botaoFecharModalCobertura.addEventListener("click", () => {
+            fecharModalCobertura();
+        });
+
+        elementos.modalCobertura.addEventListener("click", evento => {
+            if (evento.target.closest("[data-fechar-modal=\"true\"]")) {
+                fecharModalCobertura();
+            }
+        });
+
+        window.addEventListener("keydown", evento => {
+            if (evento.key === "Escape" && elementos.modalCobertura.classList.contains("visible")) {
+                fecharModalCobertura();
             }
         });
 

@@ -13,6 +13,7 @@ internal sealed class AplicacaoNsiDocs
     private ConfiguracaoAplicacao _configuracao;
     private readonly CarregadorDocumentacao _carregadorDocumentacao;
     private readonly RecuperadorContexto _recuperadorContexto;
+    private readonly AvaliadorCoberturaConsulta _avaliadorCoberturaConsulta;
     private readonly GeradorSugestoesPerguntas _geradorSugestoesPerguntas;
     private Kernel _kernel;
     private readonly SemaphoreSlim _semaforo = new(1, 1);
@@ -26,11 +27,13 @@ internal sealed class AplicacaoNsiDocs
         ConfiguracaoAplicacao configuracao,
         CarregadorDocumentacao carregadorDocumentacao,
         RecuperadorContexto recuperadorContexto,
+        AvaliadorCoberturaConsulta avaliadorCoberturaConsulta,
         GeradorSugestoesPerguntas geradorSugestoesPerguntas)
     {
         _configuracao = configuracao;
         _carregadorDocumentacao = carregadorDocumentacao;
         _recuperadorContexto = recuperadorContexto;
+        _avaliadorCoberturaConsulta = avaliadorCoberturaConsulta;
         _geradorSugestoesPerguntas = geradorSugestoesPerguntas;
         _kernel = CriarKernel(configuracao);
     }
@@ -156,13 +159,18 @@ internal sealed class AplicacaoNsiDocs
 
             var resultado = await orquestradorConsulta.ProcessarAsync(pergunta).WaitAsync(cancellationToken);
             var perguntasSugeridas = _geradorSugestoesPerguntas.Gerar(pergunta, resultado.SecoesUtilizadas);
+            var cobertura = _avaliadorCoberturaConsulta.Avaliar(
+                pergunta,
+                resultado.RespostaFinal,
+                resultado.SecoesUtilizadas);
 
             return new RespostaChatDto(
                 resultado.RespostaFinal,
                 resultado.SecoesUtilizadas
                     .Select(secao => new SecaoUtilizadaDto(secao.Projeto, secao.Titulo))
                     .ToList(),
-                perguntasSugeridas);
+                perguntasSugeridas,
+                cobertura);
         }
         finally
         {
@@ -463,7 +471,8 @@ internal sealed record SecaoUtilizadaDto(string Projeto, string Titulo);
 internal sealed record RespostaChatDto(
     string Resposta,
     IReadOnlyList<SecaoUtilizadaDto> SecoesUtilizadas,
-    IReadOnlyList<string> PerguntasSugeridas);
+    IReadOnlyList<string> PerguntasSugeridas,
+    CoberturaDocumentalDto Cobertura);
 
 internal sealed record ConfiguracaoOllamaDto(string Endpoint, string Modelo);
 

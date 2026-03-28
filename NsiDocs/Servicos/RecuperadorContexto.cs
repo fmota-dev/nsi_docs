@@ -1,5 +1,4 @@
 using System.Text;
-using System.Text.RegularExpressions;
 using NsiDocs.Modelos;
 
 namespace NsiDocs.Servicos;
@@ -13,7 +12,7 @@ internal sealed class RecuperadorContexto
         int quantidade)
     {
         var secoes = projetos.SelectMany(projeto => projeto.Secoes).ToList();
-        var termos = ExtrairTermos($"{pergunta} {string.Join(' ', planoConsulta.Temas)}");
+        var termos = AnaliseTextoBusca.ExtrairTermos($"{pergunta} {string.Join(' ', planoConsulta.Temas)}");
         var projetoAlvo = planoConsulta.ProjetoAlvo.Equals("todos", StringComparison.OrdinalIgnoreCase)
             ? null
             : planoConsulta.ProjetoAlvo;
@@ -121,37 +120,9 @@ internal sealed class RecuperadorContexto
         return termos.Overlaps(tema) ? score : 0;
     }
 
-    private static HashSet<string> ExtrairTermos(string texto)
-    {
-        var stopwords = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-        {
-            "a", "as", "o", "os", "de", "da", "do", "das", "dos", "e", "em", "no", "na", "nos", "nas",
-            "para", "por", "com", "como", "qual", "quais", "que", "se", "uma", "um", "ou", "ao", "aos",
-            "projeto", "interno", "nsi", "senac", "rn"
-        };
-
-        return Regex.Matches(NormalizarTextoBusca(texto), @"[a-z0-9\-_]{2,}")
-            .Select(match => match.Value)
-            .Where(termo => !stopwords.Contains(termo))
-            .ToHashSet(StringComparer.OrdinalIgnoreCase);
-    }
-
     internal static string NormalizarTextoBusca(string texto)
     {
-        return texto
-            .ToLowerInvariant()
-            .Replace("á", "a")
-            .Replace("à", "a")
-            .Replace("ã", "a")
-            .Replace("â", "a")
-            .Replace("é", "e")
-            .Replace("ê", "e")
-            .Replace("í", "i")
-            .Replace("ó", "o")
-            .Replace("ô", "o")
-            .Replace("õ", "o")
-            .Replace("ú", "u")
-            .Replace("ç", "c");
+        return AnaliseTextoBusca.NormalizarTexto(texto);
     }
 
     private static string ObterTextoNormalizado(string textoNormalizado, string textoOriginal)

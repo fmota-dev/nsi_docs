@@ -1,4 +1,4 @@
-const CACHE_VERSION = "nsi-docs-v11";
+const CACHE_VERSION = "nsi-docs-v12";
 const CACHE_SHELL = `${CACHE_VERSION}-shell`;
 const CACHE_API = `${CACHE_VERSION}-api`;
 const PRECACHE_URLS = [

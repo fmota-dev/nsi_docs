@@ -14,6 +14,7 @@ builder.Services.AddSingleton(_ => ConfiguracaoAplicacao.Carregar());
 builder.Services.AddSingleton<ParserSecoesMarkdown>();
 builder.Services.AddSingleton<CarregadorDocumentacao>();
 builder.Services.AddSingleton<RecuperadorContexto>();
+builder.Services.AddSingleton<AvaliadorCoberturaConsulta>();
 builder.Services.AddSingleton<GeradorSugestoesPerguntas>();
 builder.Services.AddSingleton<AplicacaoNsiDocs>();
 
