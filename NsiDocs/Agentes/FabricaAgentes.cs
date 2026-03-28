@@ -66,16 +66,16 @@ internal sealed class FabricaAgentes
         return new ChatCompletionAgent
         {
             Name = "AnalistaContexto",
-            Instructions = """
-                           Voce recebe uma pergunta e trechos recuperados da documentacao.
-                           Sua tarefa e condensar o contexto realmente util para o agente respondedor.
+            Instructions = $"""
+                            Voce recebe uma pergunta e trechos recuperados da documentacao.
+                            Sua tarefa e condensar o contexto realmente util para o agente respondedor.
 
-                           Regras:
-                           - Use apenas fatos presentes nos trechos.
-                           - Destaque projeto, secao e pontos tecnicos relevantes.
-                           - Descarte repeticoes.
-                           - Gere no maximo 15 linhas.
-                           """,
+                            Regras:
+                            - Use apenas fatos presentes nos trechos.
+                            - Destaque projeto, secao e pontos tecnicos relevantes.
+                            - Descarte repeticoes.
+                            - Gere no maximo {_configuracao.LimiteLinhasAnalista} linhas.
+                            """,
             Kernel = _kernel
         };
     }
@@ -106,21 +106,21 @@ internal sealed class FabricaAgentes
         return new ChatCompletionAgent
         {
             Name = "Formatador",
-            Instructions = """
-                           Voce formata a resposta final para console.
-                           Regras:
-                           - Use markdown simples.
-                           - Prefira titulos curtos e listas para facilitar leitura.
-                           - Se houver diagrama ASCII (com +, |, ->), envolva obrigatoriamente em bloco:
-                             ```text
-                             ...
-                             ```
-                           - Nunca escreva pseudo-tabela com pipes fora de bloco de codigo.
-                           - Preserve o conteudo tecnico.
-                           - Remova repeticoes.
-                           - Nao adicione informacoes novas.
-                           - Limite a resposta a no maximo 25 linhas.
-                           """,
+            Instructions = $"""
+                            Voce formata a resposta final para console.
+                            Regras:
+                            - Use markdown simples.
+                            - Prefira titulos curtos e listas para facilitar leitura.
+                            - Se houver diagrama ASCII (com +, |, ->), envolva obrigatoriamente em bloco:
+                              ```text
+                              ...
+                              ```
+                            - Nunca escreva pseudo-tabela com pipes fora de bloco de codigo.
+                            - Preserve o conteudo tecnico.
+                            - Remova repeticoes.
+                            - Nao adicione informacoes novas.
+                            - Limite a resposta a no maximo {_configuracao.LimiteLinhasFormatador} linhas.
+                            """,
             Kernel = _kernel
         };
     }

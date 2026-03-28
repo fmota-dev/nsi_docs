@@ -1,4 +1,4 @@
-const CACHE_VERSION = "nsi-docs-v10";
+const CACHE_VERSION = "nsi-docs-v11";
 const CACHE_SHELL = `${CACHE_VERSION}-shell`;
 const CACHE_API = `${CACHE_VERSION}-api`;
 const PRECACHE_URLS = [
@@ -11,12 +11,15 @@ const PRECACHE_URLS = [
 ];
 const API_GET_ROUTES = new Set([
     "/api/status",
-    "/api/documentos"
+    "/api/documentos",
+    "/api/ollama/configuracao"
 ]);
 const API_MUTATION_ROUTES = new Set([
     "/api/chat/perguntar",
     "/api/documentos/upload",
-    "/api/documentos/recarregar"
+    "/api/documentos/recarregar",
+    "/api/ollama/testar-conexao",
+    "/api/ollama/conectar"
 ]);
 
 self.addEventListener("install", evento => {

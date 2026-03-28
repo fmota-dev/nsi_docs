@@ -200,8 +200,8 @@ Depois da busca, o sistema separa dois conceitos:
 
 Hoje os defaults sao:
 
-- recuperadas: `8`
-- utilizadas: `4`
+- recuperadas: `12`
+- utilizadas: `6`
 
 Esse corte serve para equilibrar recall e foco:
 
@@ -546,7 +546,23 @@ Esse ponto e importante para manutencao: o orquestrador nao e um singleton fixo 
   - default atual: `gpt-oss:120b-cloud`
 - `OLLAMA_ENDPOINT`
   - endpoint HTTP do Ollama
-  - default atual: `http://10.14.10.92:11434`
+  - default atual: `http://<ipv4-da-maquina>:11434`
+
+Esses dois valores tambem podem ser alterados pela interface, na caixa `ollama`, com teste de conexao e persistencia em `configuracao.local.json`.
+
+Para tuning avancado do pipeline, a aplicacao tambem aceita overrides por variavel de ambiente:
+
+- `NSIDOCS_TIMEOUT_HTTP_SEGUNDOS`
+- `NSIDOCS_TIMEOUT_PLANEJADOR_SEGUNDOS`
+- `NSIDOCS_TIMEOUT_ANALISTA_SEGUNDOS`
+- `NSIDOCS_TIMEOUT_RESPONDEDOR_SEGUNDOS`
+- `NSIDOCS_TIMEOUT_FORMATADOR_SEGUNDOS`
+- `NSIDOCS_SECOES_RECUPERADAS`
+- `NSIDOCS_SECOES_UTILIZADAS`
+- `NSIDOCS_LIMITE_LINHAS_ANALISTA`
+- `NSIDOCS_LIMITE_LINHAS_FORMATADOR`
+
+Esses overrides foram adicionados para benchmark e tuning operacional. O frontend continua configurando apenas `endpoint` e `modelo`.
 
 ### 10.2 Timeouts
 - `TimeoutHttp`
@@ -561,6 +577,13 @@ Esse ponto e importante para manutencao: o orquestrador nao e um singleton fixo 
 - `TimeoutFormatador`
   - afeta apenas a etapa final de limpeza e apresentacao
 
+Defaults atuais do perfil adotado:
+
+- `TimeoutPlanejador`: `60s`
+- `TimeoutAnalista`: `60s`
+- `TimeoutRespondedor`: `90s`
+- `TimeoutFormatador`: `45s`
+
 Quando ajustar:
 
 - aumentar `TimeoutRespondedor` se a resposta estiver boa, mas estiver morrendo antes de terminar
@@ -573,6 +596,11 @@ Quando ajustar:
 - `QuantidadeSecoesUtilizadas`
   - define quantas entram de fato na consolidacao
 
+Defaults atuais do perfil adotado:
+
+- `QuantidadeSecoesRecuperadas`: `12`
+- `QuantidadeSecoesUtilizadas`: `6`
+
 Quando ajustar:
 
 - aumentar `Recuperadas` se o sistema estiver perdendo secoes importantes
@@ -580,6 +608,42 @@ Quando ajustar:
 - ajustar os dois em conjunto para equilibrar foco e cobertura
 
 Antes de mexer nesses valores, existe um tuning mais barato e normalmente melhor: reduzir o escopo com `documentosSelecionados`. Em muitas perguntas internas, escolher 1 ou 2 documentos melhora mais do que aumentar o numero de secoes.
+
+### 10.4 Limites de saida dos agentes
+- `LimiteLinhasAnalista`
+  - controla o quanto o `AnalistaContexto` pode condensar antes de enviar para o `Respondedor`
+- `LimiteLinhasFormatador`
+  - controla o teto de apresentacao da resposta final
+
+Defaults atuais do perfil adotado:
+
+- `LimiteLinhasAnalista`: `25`
+- `LimiteLinhasFormatador`: `40`
+
+Esses limites existem para evitar explosao de contexto e respostas prolixas demais, mas tambem influenciam diretamente a profundidade percebida no chat.
+
+### 10.5 Perfil adotado apos benchmark
+O projeto passou por benchmark comparando tres perfis:
+
+- **Perfil A**: `8/4`, `45s/45s/60s/30s`, analista `15 linhas`, formatador `25 linhas`
+- **Perfil B**: `12/6`, `60s/60s/90s/45s`, analista `25 linhas`, formatador `40 linhas`
+- **Perfil C**: `16/8`, `75s/75s/120s/60s`, analista `35 linhas`, formatador `50 linhas`
+
+Benchmark executado com `gpt-oss:120b-cloud` em `http://192.168.0.3:11434`.
+
+Resultado consolidado:
+
+- **Perfil A**
+  - latencia media aproximada: `20,1s`
+  - mais rapido em alguns cenarios, mas com respostas mais curtas e maior risco de superficialidade
+- **Perfil B**
+  - latencia media aproximada: `20,5s`
+  - melhor equilibrio entre profundidade, organizacao e estabilidade
+- **Perfil C**
+  - latencia media aproximada: `27,1s`
+  - aumento de custo e lentidao sem ganho consistente de qualidade; em algumas perguntas o resultado piorou
+
+Por isso o **Perfil B** foi mantido como default do projeto.
 
 ## 11. Decisoes Tecnicas e Tradeoffs
 ### 11.1 Markdown como base documental
@@ -696,6 +760,30 @@ Ao final:
 
 ### `POST /api/documentos/recarregar`
 Reprocessa a pasta `documentacoes` e reconstrui a base em memoria.
+
+### `GET /api/ollama/configuracao`
+Retorna a configuracao atual em uso para:
+
+- `endpoint`
+- `modelo`
+
+### `POST /api/ollama/testar-conexao`
+Body:
+
+```json
+{
+  "endpoint": "http://192.168.0.3:11434",
+  "modelo": "llama3.1:latest"
+}
+```
+
+Valida se:
+
+- o endpoint responde ao Ollama
+- o modelo informado pode ser validado no endpoint
+
+### `POST /api/ollama/conectar`
+Recebe o mesmo payload de teste, valida a conexao e salva a configuracao atual para uso imediato e persistencia local.
 
 ### `POST /api/chat/perguntar`
 Body:

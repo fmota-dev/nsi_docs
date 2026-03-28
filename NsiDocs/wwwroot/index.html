@@ -284,6 +284,24 @@
             margin-bottom: 12px;
         }
 
+        .settings-form {
+            display: grid;
+            gap: 10px;
+        }
+
+        .field-stack {
+            display: grid;
+            gap: 6px;
+        }
+
+        .field-label {
+            color: var(--text-faint);
+            font-size: 0.72rem;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            font-family: "IBM Plex Mono", monospace;
+        }
+
         .filter-field {
             display: grid;
             grid-template-columns: minmax(0, 1fr) auto;
@@ -291,6 +309,7 @@
             align-items: center;
         }
 
+        .field-input,
         .filter-input {
             width: 100%;
             min-width: 0;
@@ -304,16 +323,19 @@
             line-height: 1.4;
         }
 
+        .field-input:hover,
         .filter-input:hover {
             border-color: var(--line-strong);
         }
 
+        .field-input:focus,
         .filter-input:focus {
             outline: none;
             border-color: rgba(45, 74, 63, 0.3);
             box-shadow: 0 0 0 4px rgba(45, 74, 63, 0.08);
         }
 
+        .field-input::placeholder,
         .filter-input::placeholder {
             color: var(--text-faint);
         }
@@ -745,6 +767,45 @@
             margin-top: 12px;
         }
 
+        .followups {
+            margin-top: 14px;
+            display: grid;
+            gap: 8px;
+        }
+
+        .followups-title {
+            color: var(--text-faint);
+            font-size: 0.72rem;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            font-family: "IBM Plex Mono", monospace;
+        }
+
+        .followups-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .followup-btn {
+            border: 1px solid var(--line);
+            border-radius: 999px;
+            background: rgba(255, 252, 246, 0.98);
+            padding: 9px 12px;
+            cursor: pointer;
+            text-align: left;
+            color: var(--text);
+            font-family: "IBM Plex Mono", monospace;
+            font-size: 0.76rem;
+            line-height: 1.45;
+        }
+
+        .followup-btn:hover {
+            border-color: rgba(45, 74, 63, 0.28);
+            background: rgba(234, 243, 237, 0.96);
+            transform: translateY(-1px);
+        }
+
         .context-chip {
             display: inline-flex;
             align-items: center;
@@ -1149,6 +1210,28 @@
             </section>
 
             <section class="box">
+                <div class="section-title">ollama</div>
+                <form id="form-ollama" class="settings-form">
+                    <div class="field-stack">
+                        <label for="endpoint-ollama" class="field-label">endpoint</label>
+                        <input id="endpoint-ollama" class="field-input mono" type="url" placeholder="http://192.168.0.3:11434" spellcheck="false" autocomplete="off">
+                    </div>
+
+                    <div class="field-stack">
+                        <label for="modelo-ollama" class="field-label">modelo</label>
+                        <input id="modelo-ollama" class="field-input mono" type="text" placeholder="qwen2.5:3b" spellcheck="false" autocomplete="off">
+                    </div>
+
+                    <div class="upload-actions" style="margin-top: 2px;">
+                        <button id="botao-testar-ollama" type="button" class="btn">Testar conexão</button>
+                        <button id="botao-conectar-ollama" type="submit" class="btn primary">Conectar</button>
+                    </div>
+
+                    <div id="mensagem-ollama" class="notice"></div>
+                </form>
+            </section>
+
+            <section class="box">
                 <div class="section-title">upload</div>
                 <form id="form-upload">
                     <label id="dropzone" class="dropzone">
@@ -1277,11 +1360,17 @@
             nomeArquivo: document.getElementById("nome-arquivo"),
             dropzone: document.getElementById("dropzone"),
             formChat: document.getElementById("form-chat"),
+            formOllama: document.getElementById("form-ollama"),
             formUpload: document.getElementById("form-upload"),
             botaoPerguntar: document.getElementById("botao-perguntar"),
             botaoExemplo: document.getElementById("botao-exemplo"),
             botaoUpload: document.getElementById("botao-upload"),
             botaoRecarregar: document.getElementById("botao-recarregar"),
+            endpointOllama: document.getElementById("endpoint-ollama"),
+            modeloOllama: document.getElementById("modelo-ollama"),
+            botaoTestarOllama: document.getElementById("botao-testar-ollama"),
+            botaoConectarOllama: document.getElementById("botao-conectar-ollama"),
+            mensagemOllama: document.getElementById("mensagem-ollama"),
             limparChat: document.getElementById("limpar-chat"),
             avisoConectividade: document.getElementById("aviso-conectividade"),
             botaoInstalarApp: document.getElementById("botao-instalar-app")
@@ -1295,6 +1384,7 @@
         let mensagemPendente = null;
         let conectado = navigator.onLine;
         let carregandoPergunta = false;
+        let carregandoOllama = false;
         let carregandoUpload = false;
         let promptInstalacao = null;
 
@@ -1324,6 +1414,10 @@
             elementos.botaoUpload.disabled = carregandoUpload || !conectado;
             elementos.botaoRecarregar.disabled = carregandoUpload || !conectado;
             elementos.arquivo.disabled = carregandoUpload || !conectado;
+            elementos.botaoTestarOllama.disabled = carregandoOllama;
+            elementos.botaoConectarOllama.disabled = carregandoOllama;
+            elementos.endpointOllama.disabled = carregandoOllama;
+            elementos.modeloOllama.disabled = carregandoOllama;
         }
 
         function atualizarConectividadeUI() {
@@ -1363,6 +1457,21 @@
                 .replaceAll(">", "&gt;")
                 .replaceAll('"', "&quot;")
                 .replaceAll("'", "&#039;");
+        }
+
+        function obterConfiguracaoOllamaFormulario() {
+            return {
+                endpoint: elementos.endpointOllama.value.trim(),
+                modelo: elementos.modeloOllama.value.trim()
+            };
+        }
+
+        function resumoModelosDisponiveis(modelosDisponiveis = []) {
+            if (!Array.isArray(modelosDisponiveis) || !modelosDisponiveis.length) {
+                return "";
+            }
+
+            return ` Modelos visíveis: ${modelosDisponiveis.slice(0, 4).join(", ")}${modelosDisponiveis.length > 4 ? "..." : ""}`;
         }
 
         function ehLinhaAsciiPossivel(linha = "") {
@@ -1645,6 +1754,27 @@
             `;
         }
 
+        function botoesSugestoes(perguntasSugeridas = []) {
+            if (!perguntasSugeridas.length) {
+                return "";
+            }
+
+            return `
+                <div class="followups">
+                    <div class="followups-title">próximas perguntas</div>
+                    <div class="followups-list">
+                        ${perguntasSugeridas.map(pergunta => `
+                            <button
+                                type="button"
+                                class="followup-btn"
+                                data-pergunta="${escaparHtml(pergunta)}"
+                                data-enviar="true">${escaparHtml(pergunta)}</button>
+                        `).join("")}
+                    </div>
+                </div>
+            `;
+        }
+
         function rolarFim() {
             elementos.mensagens.scrollTop = elementos.mensagens.scrollHeight;
         }
@@ -1696,7 +1826,7 @@
             }
         }
 
-        function adicionarMensagemAssistente(markdown, secoes = [], erro = false) {
+        function adicionarMensagemAssistente(markdown, secoes = [], erro = false, perguntasSugeridas = []) {
             removerEstadoVazio();
             removerMensagemPendente();
 
@@ -1711,6 +1841,7 @@
                 <div class="msg-body">
                     <div class="markdown">${renderizarMarkdownSeguro(markdown)}</div>
                     ${chipsContexto(secoes)}
+                    ${erro ? "" : botoesSugestoes(perguntasSugeridas)}
                 </div>
             `;
 
@@ -1808,6 +1939,14 @@
             elementos.chipSecoes.textContent = `seções: ${status.quantidadeSecoes}`;
         }
 
+        async function carregarConfiguracaoOllama() {
+            const resposta = await fetch("/api/ollama/configuracao");
+            const configuracao = await resposta.json();
+
+            elementos.endpointOllama.value = configuracao.endpoint || "";
+            elementos.modeloOllama.value = configuracao.modelo || "";
+        }
+
         async function carregarDocumentos() {
             const resposta = await fetch("/api/documentos");
             const documentos = await resposta.json();
@@ -1843,6 +1982,20 @@
             carregandoUpload = carregando;
             atualizarDisponibilidadeBotoesRede();
             aviso(elementos.mensagemUpload, mensagem, tipo);
+        }
+
+        function definirEstadoOllama(carregando, mensagem = "", tipo = "") {
+            carregandoOllama = carregando;
+            atualizarDisponibilidadeBotoesRede();
+
+            if (mensagem) {
+                aviso(elementos.mensagemOllama, mensagem, tipo);
+                return;
+            }
+
+            if (!carregando) {
+                aviso(elementos.mensagemOllama, "");
+            }
         }
 
         elementos.formChat.addEventListener("submit", async evento => {
@@ -1893,7 +2046,11 @@
                     throw new Error(dados.mensagem || "falha ao consultar");
                 }
 
-                adicionarMensagemAssistente(dados.resposta, dados.secoesUtilizadas || []);
+                adicionarMensagemAssistente(
+                    dados.resposta,
+                    dados.secoesUtilizadas || [],
+                    false,
+                    dados.perguntasSugeridas || []);
                 salvarHistorico(pergunta, dados.resposta);
                 aviso(elementos.mensagemChat, "ok", "success");
             } catch (erro) {
@@ -1939,6 +2096,68 @@
                 definirEstadoUpload(false, dados.mensagem, "success");
             } catch (erro) {
                 definirEstadoUpload(false, erro.message, "error");
+            }
+        });
+
+        elementos.botaoTestarOllama.addEventListener("click", async () => {
+            const configuracao = obterConfiguracaoOllamaFormulario();
+            if (!configuracao.endpoint || !configuracao.modelo) {
+                definirEstadoOllama(false, "preencha endpoint e modelo antes de testar", "error");
+                return;
+            }
+
+            definirEstadoOllama(true, "testando conexão...");
+
+            try {
+                const resposta = await fetch("/api/ollama/testar-conexao", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify(configuracao)
+                });
+
+                const dados = await resposta.json();
+                if (!resposta.ok) {
+                    throw new Error(dados.mensagem || "falha ao testar conexão");
+                }
+
+                definirEstadoOllama(false, `${dados.mensagem}${resumoModelosDisponiveis(dados.modelosDisponiveis)}`, "success");
+            } catch (erro) {
+                definirEstadoOllama(false, erro.message, "error");
+            }
+        });
+
+        elementos.formOllama.addEventListener("submit", async evento => {
+            evento.preventDefault();
+            const configuracao = obterConfiguracaoOllamaFormulario();
+            if (!configuracao.endpoint || !configuracao.modelo) {
+                definirEstadoOllama(false, "preencha endpoint e modelo antes de conectar", "error");
+                return;
+            }
+
+            definirEstadoOllama(true, "salvando conexão...");
+
+            try {
+                const resposta = await fetch("/api/ollama/conectar", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify(configuracao)
+                });
+
+                const dados = await resposta.json();
+                if (!resposta.ok) {
+                    throw new Error(dados.mensagem || "falha ao salvar conexão");
+                }
+
+                elementos.endpointOllama.value = dados.endpoint || configuracao.endpoint;
+                elementos.modeloOllama.value = dados.modelo || configuracao.modelo;
+                await carregarStatus();
+                definirEstadoOllama(false, `${dados.mensagem}${resumoModelosDisponiveis(dados.modelosDisponiveis)}`, "success");
+            } catch (erro) {
+                definirEstadoOllama(false, erro.message, "error");
             }
         });
 
@@ -2109,6 +2328,11 @@
             elementos.pergunta.value = botao.dataset.pergunta;
             atualizarContadorCaracteres();
             ajustarAlturaTextarea();
+            if (botao.dataset.enviar === "true") {
+                elementos.formChat.requestSubmit();
+                return;
+            }
+
             elementos.pergunta.focus();
         });
 
@@ -2173,7 +2397,7 @@
             ajustarAlturaTextarea();
 
             try {
-                await Promise.all([carregarStatus(), carregarDocumentos()]);
+                await Promise.all([carregarStatus(), carregarDocumentos(), carregarConfiguracaoOllama()]);
             } catch {
                 aviso(elementos.mensagemChat, "falha ao carregar", "error");
             }

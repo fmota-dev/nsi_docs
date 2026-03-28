@@ -1,5 +1,4 @@
 using Microsoft.AspNetCore.Http.Features;
-using Microsoft.SemanticKernel;
 using NsiDocs;
 using NsiDocs.Configuracoes;
 using NsiDocs.Servicos;
@@ -15,22 +14,7 @@ builder.Services.AddSingleton(_ => ConfiguracaoAplicacao.Carregar());
 builder.Services.AddSingleton<ParserSecoesMarkdown>();
 builder.Services.AddSingleton<CarregadorDocumentacao>();
 builder.Services.AddSingleton<RecuperadorContexto>();
-builder.Services.AddSingleton(sp =>
-{
-    var configuracao = sp.GetRequiredService<ConfiguracaoAplicacao>();
-    var httpClient = new HttpClient
-    {
-        BaseAddress = new Uri(configuracao.EndpointOllama),
-        Timeout = configuracao.TimeoutHttp
-    };
-
-    var kernelBuilder = Kernel.CreateBuilder();
-    kernelBuilder.AddOllamaChatCompletion(
-        modelId: configuracao.ModeloOllama,
-        httpClient: httpClient);
-
-    return kernelBuilder.Build();
-});
+builder.Services.AddSingleton<GeradorSugestoesPerguntas>();
 builder.Services.AddSingleton<AplicacaoNsiDocs>();
 
 var app = builder.Build();
@@ -63,6 +47,46 @@ app.MapGet("/api/documentos", async (AplicacaoNsiDocs aplicacao, CancellationTok
 {
     var documentos = await aplicacao.ListarDocumentosAsync(cancellationToken);
     return Results.Ok(documentos);
+});
+
+app.MapGet("/api/ollama/configuracao", async (AplicacaoNsiDocs aplicacao, CancellationToken cancellationToken) =>
+{
+    var configuracao = await aplicacao.ObterConfiguracaoOllamaAsync(cancellationToken);
+    return Results.Ok(configuracao);
+});
+
+app.MapPost("/api/ollama/testar-conexao", async (ConfiguracaoOllamaRequestDto request, AplicacaoNsiDocs aplicacao, CancellationToken cancellationToken) =>
+{
+    try
+    {
+        var resultado = await aplicacao.TestarConexaoOllamaAsync(
+            (request.Endpoint ?? string.Empty).Trim(),
+            (request.Modelo ?? string.Empty).Trim(),
+            cancellationToken);
+
+        return Results.Ok(resultado);
+    }
+    catch (Exception ex)
+    {
+        return Results.BadRequest(new ErroRespostaDto(ex.Message));
+    }
+});
+
+app.MapPost("/api/ollama/conectar", async (ConfiguracaoOllamaRequestDto request, AplicacaoNsiDocs aplicacao, CancellationToken cancellationToken) =>
+{
+    try
+    {
+        var resultado = await aplicacao.SalvarConfiguracaoOllamaAsync(
+            (request.Endpoint ?? string.Empty).Trim(),
+            (request.Modelo ?? string.Empty).Trim(),
+            cancellationToken);
+
+        return Results.Ok(resultado);
+    }
+    catch (Exception ex)
+    {
+        return Results.BadRequest(new ErroRespostaDto(ex.Message));
+    }
 });
 
 app.MapPost("/api/documentos/recarregar", async (AplicacaoNsiDocs aplicacao, CancellationToken cancellationToken) =>
@@ -131,6 +155,8 @@ app.Run();
 namespace NsiDocs
 {
     internal sealed record PerguntaRequestDto(string Pergunta, IReadOnlyList<string>? DocumentosSelecionados);
+
+    internal sealed record ConfiguracaoOllamaRequestDto(string Endpoint, string Modelo);
 
     internal sealed record ErroRespostaDto(string Mensagem);
 }
