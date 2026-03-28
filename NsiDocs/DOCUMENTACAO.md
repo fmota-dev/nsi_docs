@@ -63,10 +63,13 @@ Componentes principais:
 ### 4.1 Entrada da Pergunta
 O usuario envia uma pergunta para `POST /api/chat/perguntar`.
 
+Opcionalmente, essa chamada pode carregar `documentosSelecionados`, que representa o subconjunto de `.md` que deve participar da consulta. Esse filtro e rigido: se ele vier preenchido, o restante da base e completamente ignorado naquela pergunta.
+
 Em [Program.cs](C:\Users\fmota\Documents\projetos\Learning\NsiDocs\NsiDocs\Program.cs), a API:
 
 - valida se a pergunta existe
 - delega a consulta para `AplicacaoNsiDocs.PerguntarAsync`
+- aceita `documentosSelecionados` como lista opcional de identificadores estaveis
 - trata `timeout` como HTTP `408`
 - retorna erro de negocio como `400`
 
@@ -74,10 +77,23 @@ Em [AplicacaoNsiDocs.cs](C:\Users\fmota\Documents\projetos\Learning\NsiDocs\NsiD
 
 - leitura da base carregada
 - reprocessamento de documentos
-- execucao do orquestrador atual
+- criacao do orquestrador da consulta atual
 
 ### 4.2 Criacao Dinamica dos Agentes
-O metodo `ProcessarAsync` em [OrquestradorConsulta.cs](C:\Users\fmota\Documents\projetos\Learning\NsiDocs\NsiDocs\Agentes\OrquestradorConsulta.cs) cria quatro agentes por consulta:
+Antes de entrar em `ProcessarAsync`, a [AplicacaoNsiDocs.cs](C:\Users\fmota\Documents\projetos\Learning\NsiDocs\NsiDocs\Servicos\AplicacaoNsiDocs.cs) resolve quais documentos podem participar da consulta atual.
+
+Esse passo usa o `identificador` de cada documento, que e o caminho relativo normalizado dentro de `documentacoes/`. Exemplos:
+
+- `carreiras.md`
+- `rh/integrador-rh.md`
+
+Se a selecao vier vazia ou ausente, a consulta usa toda a base carregada. Se vier preenchida, a aplicacao filtra `_projetos` e cria uma nova [FabricaAgentes.cs](C:\Users\fmota\Documents\projetos\Learning\NsiDocs\NsiDocs\Agentes\FabricaAgentes.cs) apenas com esse subconjunto. Isso garante que:
+
+- o `Planejador` veja um indice menor e mais focado
+- o plugin do Semantic Kernel seja registrado somente com os documentos permitidos
+- o fallback local use exatamente o mesmo universo
+
+So depois disso o metodo `ProcessarAsync` em [OrquestradorConsulta.cs](C:\Users\fmota\Documents\projetos\Learning\NsiDocs\NsiDocs\Agentes\OrquestradorConsulta.cs) cria quatro agentes por consulta:
 
 - `Planejador`
 - `AnalistaContexto`
@@ -110,6 +126,8 @@ Objetivo: listar a stack tecnica do projeto de forma organizada
 Esse planejamento resolve um problema importante: a pergunta do usuario pode ser vaga, mas a busca de contexto precisa ser mais estruturada. O `Planejador` transforma linguagem natural em intencao operacional.
 
 ### 4.4 Etapa 2: Recuperacao de Contexto
+Antes da recuperacao em si, existe um corte importante de universo: o sistema so considera os documentos liberados pela selecao atual do usuario. Esse filtro impacta o pipeline inteiro, nao apenas a exibicao do frontend.
+
 Depois que o plano e interpretado, o sistema tenta recuperar secoes relevantes em duas camadas:
 
 1. caminho preferencial: plugin do Semantic Kernel
@@ -126,6 +144,8 @@ Esse plugin recebe:
 - `projetoAlvo`
 - `temasCsv`
 - `quantidade`
+
+Como o plugin e instanciado a partir da lista de projetos da consulta atual, ele nao precisa receber `documentosSelecionados` diretamente. O escopo ja chega filtrado na propria fabrica.
 
 E devolve JSON com:
 
@@ -144,7 +164,15 @@ Se a chamada do plugin falhar por qualquer motivo, o sistema cai para:
 Esse fallback evita que a consulta dependa exclusivamente da camada de plugin. Na pratica, ele aumenta robustez operacional: se houver falha de invocacao do kernel/plugin, a aplicacao ainda tenta responder usando a heuristica local.
 
 ### 4.5 Como o Score das Secoes e Calculado
-O [RecuperadorContexto.cs](C:\Users\fmota\Documents\projetos\Learning\NsiDocs\NsiDocs\Servicos\RecuperadorContexto.cs) extrai termos da pergunta e dos temas planejados, normaliza texto e calcula score por secao.
+O [RecuperadorContexto.cs](C:\Users\fmota\Documents\projetos\Learning\NsiDocs\NsiDocs\Servicos\RecuperadorContexto.cs) extrai termos da pergunta e dos temas planejados e calcula score por secao.
+
+Desde a primeira otimização da camada de busca, a normalizacao dos campos nao acontece mais dentro de cada consulta. Durante a carga dos `.md`, o [CarregadorDocumentacao.cs](C:\Users\fmota\Documents\projetos\Learning\NsiDocs\NsiDocs\Servicos\CarregadorDocumentacao.cs) preenche em cada `SecaoDocumento`:
+
+- `ProjetoNormalizado`
+- `TituloNormalizado`
+- `ConteudoNormalizado`
+
+Na consulta, o recuperador reutiliza esses campos ja preparados e so normaliza a pergunta e o projeto alvo.
 
 Fatores relevantes do score:
 
@@ -399,7 +427,13 @@ O plugin registrado na fabrica se chama:
 
 - `DocumentacaoPlugin`
 
-Ele e recriado sempre que a base documental e recarregada. Isso e importante porque o plugin depende da lista de projetos carregados em memoria naquele momento.
+Ele e recriado sempre que uma nova [FabricaAgentes.cs](C:\Users\fmota\Documents\projetos\Learning\NsiDocs\NsiDocs\Agentes\FabricaAgentes.cs) e instanciada. Na pratica, isso acontece:
+
+- na inicializacao da aplicacao
+- depois de um upload ou recarga do indice
+- em cada consulta, quando a aplicacao monta a fabrica com o subconjunto de documentos selecionados
+
+Isso e importante porque o plugin depende da lista de projetos visiveis naquela consulta especifica.
 
 ### 7.1 Como ele e registrado
 Na [FabricaAgentes.cs](C:\Users\fmota\Documents\projetos\Learning\NsiDocs\NsiDocs\Agentes\FabricaAgentes.cs), o metodo `RegistrarPluginDocumentacao()`:
@@ -409,6 +443,7 @@ Na [FabricaAgentes.cs](C:\Users\fmota\Documents\projetos\Learning\NsiDocs\NsiDoc
 - adiciona o plugin ao kernel atual
 
 Esse desenho evita plugin stale quando documentos novos sao enviados ou o indice e recarregado.
+Tambem evita um problema de escopo: se o usuario marcar apenas alguns documentos no frontend, o plugin daquela consulta passa a enxergar somente esse subconjunto.
 
 ### 7.2 Por que o plugin existe
 Ele existe para dar ao kernel uma interface explicita de acesso a documentacao, em vez de depender apenas de texto colado no prompt.
@@ -460,6 +495,14 @@ A base do sistema vem da pasta:
 
 Cada arquivo `.md` vira um `ProjetoDocumentacao`.
 
+Durante a carga, cada documento recebe:
+
+- `Nome`
+- `Arquivo`
+- `Identificador`
+
+O `Identificador` e o caminho relativo normalizado dentro de `documentacoes/`, usado para filtro rigido no backend e persistencia de selecao no frontend.
+
 ### 8.2 Regra de parsing
 O [ParserSecoesMarkdown.cs](C:\Users\fmota\Documents\projetos\Learning\NsiDocs\NsiDocs\Servicos\ParserSecoesMarkdown.cs) considera como secoes indexaveis cabecalhos de:
 
@@ -489,11 +532,12 @@ Responsabilidades:
 
 - carregar e recarregar a base documental
 - manter `_projetos` em memoria
-- reconstruir `FabricaAgentes` e `OrquestradorConsulta` quando a base muda
+- filtrar `_projetos` por `documentosSelecionados` quando a consulta pede um subconjunto
+- criar `FabricaAgentes` e `OrquestradorConsulta` para a consulta atual
 - serializar acesso com `SemaphoreSlim`
 - tratar upload de novos documentos
 
-Esse ponto e importante para manutencao: o orquestrador nao e um singleton fixo de logica imutavel. Ele depende do estado atual da base documental carregada.
+Esse ponto e importante para manutencao: o orquestrador nao e um singleton fixo de logica imutavel. Ele depende do estado atual da base documental carregada e, agora, tambem do subconjunto de documentos permitido pela interface.
 
 ## 10. Configuracao e Tuning
 ### 10.1 Variaveis de ambiente
@@ -535,6 +579,8 @@ Quando ajustar:
 - diminuir `Utilizadas` se as respostas estiverem difusas
 - ajustar os dois em conjunto para equilibrar foco e cobertura
 
+Antes de mexer nesses valores, existe um tuning mais barato e normalmente melhor: reduzir o escopo com `documentosSelecionados`. Em muitas perguntas internas, escolher 1 ou 2 documentos melhora mais do que aumentar o numero de secoes.
+
 ## 11. Decisoes Tecnicas e Tradeoffs
 ### 11.1 Markdown como base documental
 **Vantagens**
@@ -564,12 +610,37 @@ Quando ajustar:
 - previsibilidade
 - baixo acoplamento com embeddings ou busca vetorial
 - facilidade de explicar por que uma secao foi selecionada
+- reaproveitamento de campos normalizados precomputados em memoria
 
 **Tradeoff**
 
 - heuristica precisa evoluir conforme surgem novos padroes de consulta
 
-### 11.4 Plugin com fallback
+### 11.4 Preprocessamento em memoria
+**Vantagens**
+
+- reduz trabalho repetitivo por pergunta
+- melhora latencia sem mudar o contrato da aplicacao
+- mantem a busca totalmente local e simples de depurar
+
+**Tradeoff**
+
+- aumenta um pouco o custo da etapa de carga/recarrega
+- adiciona mais dados mantidos em memoria por secao
+
+### 11.5 Filtro rigido por documentos
+**Vantagens**
+
+- reduz ruido sem alterar a heuristica
+- melhora tempo de resposta quando o usuario conhece o dominio da pergunta
+- garante que o `Planejador`, o plugin e o fallback trabalhem sobre o mesmo recorte
+
+**Tradeoff**
+
+- se o usuario selecionar pouco demais, pode esconder a resposta certa
+- exige reconciliacao da selecao quando a lista de documentos muda
+
+### 11.6 Plugin com fallback
 **Vantagens**
 
 - integra bem com o kernel
@@ -579,7 +650,7 @@ Quando ajustar:
 
 - adiciona uma camada extra de orquestracao e pontos de observacao
 
-### 11.5 Pipeline multiagente
+### 11.7 Pipeline multiagente
 **Vantagens**
 
 - qualidade melhor controlada
@@ -602,6 +673,14 @@ Retorna:
 ### `GET /api/documentos`
 Lista os documentos carregados.
 
+Cada item retorna:
+
+- `identificador`
+  - caminho relativo normalizado dentro de `documentacoes/`
+- `nome`
+- `arquivo`
+- `quantidadeSecoes`
+
 ### `POST /api/documentos/upload`
 Recebe `multipart/form-data` com o campo `arquivo`.
 
@@ -622,8 +701,17 @@ Reprocessa a pasta `documentacoes` e reconstrui a base em memoria.
 Body:
 
 ```json
-{ "pergunta": "Sua pergunta aqui" }
+{
+  "pergunta": "Sua pergunta aqui",
+  "documentosSelecionados": ["carreiras.md", "rh/integrador-rh.md"]
+}
 ```
+
+Regras:
+
+- se `documentosSelecionados` vier vazio ou ausente, a consulta usa toda a base
+- se vier preenchido, a consulta fica limitada a esses identificadores
+- se nenhum identificador valido restar depois do filtro, a API responde `400`
 
 Resposta:
 
@@ -646,6 +734,8 @@ Pontos relevantes:
 - renderiza a resposta em markdown
 - mostra as secoes utilizadas
 - mantem historico local em `localStorage`
+- mantem a selecao atual de documentos em `localStorage`
+- permite marcar todos ou limpar a selecao no painel `docs`
 - envia upload de `.md`
 - funciona como PWA com shell offline
 
@@ -703,6 +793,7 @@ Possiveis causas:
 Acoes:
 
 - revisar qualidade dos cabecalhos no `.md`
+- reduzir o universo marcando apenas os documentos do dominio certo
 - aumentar `QuantidadeSecoesRecuperadas`
 - formular pergunta com mais contexto tecnico
 
@@ -715,6 +806,7 @@ Possiveis causas:
 
 Acoes:
 
+- limitar a pergunta a um subconjunto de documentos quando possivel
 - reduzir escopo da pergunta
 - revisar modelo configurado
 - ajustar `TimeoutRespondedor`
@@ -747,6 +839,7 @@ Isso normalmente indica:
 - pergunta fora do escopo da base
 - documentacao insuficiente
 - cabecalhos pouco expressivos
+- filtro de documentos restritivo demais
 
 ### 15.6 Resposta com markdown ou ASCII inesperado
 Se o modelo gerar diagramas ASCII ou pseudo-tabelas, a camada final de formatacao e o frontend tentam preservar esse conteudo como bloco de codigo.
