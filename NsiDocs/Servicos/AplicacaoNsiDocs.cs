@@ -1,6 +1,8 @@
 using System.Text;
 using System.Text.Json;
+using System.Runtime.CompilerServices;
 using System.Net.Http.Json;
+using System.Threading.Channels;
 using Microsoft.SemanticKernel;
 using NsiDocs.Agentes;
 using NsiDocs.Configuracoes;
@@ -157,7 +159,7 @@ internal sealed class AplicacaoNsiDocs
 
             var orquestradorConsulta = CriarOrquestradorConsulta(projetosConsulta);
 
-            var resultado = await orquestradorConsulta.ProcessarAsync(pergunta).WaitAsync(cancellationToken);
+            var resultado = await orquestradorConsulta.ProcessarAsync(pergunta, cancellationToken);
             var perguntasSugeridas = _geradorSugestoesPerguntas.Gerar(pergunta, resultado.SecoesUtilizadas);
             var cobertura = _avaliadorCoberturaConsulta.Avaliar(
                 pergunta,
@@ -175,6 +177,95 @@ internal sealed class AplicacaoNsiDocs
         finally
         {
             _semaforo.Release();
+        }
+    }
+
+    public async IAsyncEnumerable<EventoStreamChatDto> PerguntarStreamingAsync(
+        string pergunta,
+        IReadOnlyList<string>? documentosSelecionados = null,
+        [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(pergunta))
+        {
+            throw new ArgumentException("A pergunta nao pode ser vazia.", nameof(pergunta));
+        }
+
+        var canal = Channel.CreateUnbounded<EventoStreamChatDto>(new UnboundedChannelOptions
+        {
+            SingleReader = true,
+            SingleWriter = true
+        });
+
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await _semaforo.WaitAsync(cancellationToken);
+                try
+                {
+                    var projetosConsulta = FiltrarProjetosSelecionados(documentosSelecionados);
+                    if (projetosConsulta.Count == 0)
+                    {
+                        throw new InvalidOperationException("Nenhum documento selecionado e valido para a consulta.");
+                    }
+
+                    var orquestradorConsulta = CriarOrquestradorConsulta(projetosConsulta);
+                    var resultado = await orquestradorConsulta.ProcessarStreamingAsync(
+                        pergunta,
+                        (mensagem, ct) => canal.Writer.WriteAsync(
+                            new EventoStreamChatDto("status", Mensagem: mensagem),
+                            ct).AsTask(),
+                        (conteudo, ct) => canal.Writer.WriteAsync(
+                            new EventoStreamChatDto("chunk", Conteudo: conteudo),
+                            ct).AsTask(),
+                        cancellationToken);
+
+                    var perguntasSugeridas = _geradorSugestoesPerguntas.Gerar(pergunta, resultado.SecoesUtilizadas);
+                    var cobertura = _avaliadorCoberturaConsulta.Avaliar(
+                        pergunta,
+                        resultado.RespostaFinal,
+                        resultado.SecoesUtilizadas);
+
+                    await canal.Writer.WriteAsync(
+                        new EventoStreamChatDto(
+                            "complete",
+                            Resposta: resultado.RespostaFinal,
+                            SecoesUtilizadas: resultado.SecoesUtilizadas
+                                .Select(secao => new SecaoUtilizadaDto(secao.Projeto, secao.Titulo))
+                                .ToList(),
+                            PerguntasSugeridas: perguntasSugeridas,
+                            Cobertura: cobertura),
+                        cancellationToken);
+                }
+                finally
+                {
+                    _semaforo.Release();
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                if (!cancellationToken.IsCancellationRequested)
+                {
+                    await canal.Writer.WriteAsync(
+                        new EventoStreamChatDto("error", Mensagem: "timeout da consulta; tente algo mais específico"),
+                        CancellationToken.None);
+                }
+            }
+            catch (Exception ex)
+            {
+                await canal.Writer.WriteAsync(
+                    new EventoStreamChatDto("error", Mensagem: ex.Message),
+                    CancellationToken.None);
+            }
+            finally
+            {
+                canal.Writer.TryComplete();
+            }
+        }, CancellationToken.None);
+
+        await foreach (var evento in canal.Reader.ReadAllAsync(cancellationToken))
+        {
+            yield return evento;
         }
     }
 
@@ -473,6 +564,15 @@ internal sealed record RespostaChatDto(
     IReadOnlyList<SecaoUtilizadaDto> SecoesUtilizadas,
     IReadOnlyList<string> PerguntasSugeridas,
     CoberturaDocumentalDto Cobertura);
+
+internal sealed record EventoStreamChatDto(
+    string Tipo,
+    string? Mensagem = null,
+    string? Conteudo = null,
+    string? Resposta = null,
+    IReadOnlyList<SecaoUtilizadaDto>? SecoesUtilizadas = null,
+    IReadOnlyList<string>? PerguntasSugeridas = null,
+    CoberturaDocumentalDto? Cobertura = null);
 
 internal sealed record ConfiguracaoOllamaDto(string Endpoint, string Modelo);
 

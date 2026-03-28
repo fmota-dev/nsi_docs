@@ -887,6 +887,40 @@
             font-size: 0.82rem;
         }
 
+        .stream-status {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            color: var(--text-soft);
+            font-family: "IBM Plex Mono", monospace;
+            font-size: 0.78rem;
+        }
+
+        .stream-preview {
+            margin-top: 12px;
+            padding: 12px 14px;
+            border: 1px solid rgba(60, 44, 26, 0.08);
+            border-radius: 14px;
+            background: rgba(255, 252, 246, 0.78);
+            color: var(--text);
+            font-size: 0.92rem;
+            line-height: 1.75;
+            word-break: break-word;
+            display: none;
+        }
+
+        .stream-preview.visible {
+            display: block;
+        }
+
+        .stream-preview .markdown {
+            font-size: 0.92rem;
+        }
+
+        .stream-preview .markdown > :last-child {
+            margin-bottom: 0;
+        }
+
         .dots {
             display: inline-flex;
             gap: 4px;
@@ -1568,6 +1602,9 @@
         let documentosSelecionados = new Set();
         let filtroDocumentos = "";
         let mensagemPendente = null;
+        let bufferRespostaStreaming = "";
+        let bufferRespostaStreamingRenderizado = "";
+        let renderizacaoStreamingAgendada = null;
         let conectado = navigator.onLine;
         let carregandoPergunta = false;
         let carregandoOllama = false;
@@ -1753,7 +1790,7 @@
         }
 
         function renderizarMarkdownSeguro(markdown = "") {
-            const markdownNormalizado = protegerDiagramasAsciiNoMarkdown(markdown);
+            const markdownNormalizado = protegerDiagramasAsciiNoMarkdown(normalizarMarkdownModelo(markdown));
 
             if (!window.marked || !window.DOMPurify) {
                 return `<p>${escaparHtml(markdownNormalizado).replace(/\n/g, "<br>")}</p>`;
@@ -1767,6 +1804,77 @@
             return DOMPurify.sanitize(marked.parse(markdownNormalizado), {
                 USE_PROFILES: { html: true }
             });
+        }
+
+        function aplicarTransformacaoForaDeBlocosCodigo(markdown = "", transformador) {
+            const partes = markdown.split(/(```[\s\S]*?```)/g);
+            return partes
+                .map(parte => parte.startsWith("```") ? parte : transformador(parte))
+                .join("");
+        }
+
+        function normalizarMarkdownModelo(markdown = "") {
+            return aplicarTransformacaoForaDeBlocosCodigo(markdown, trecho => {
+                let normalizado = trecho.replace(/\r\n/g, "\n");
+
+                normalizado = normalizado.replace(/([^\n])(?=##?\s|#{3,6}\s)/g, "$1\n\n");
+                normalizado = normalizado.replace(/^(#{1,6}\s+[^\n#]*?)(?=(-\s+|[*]\s+))/gm, "$1\n");
+                normalizado = normalizado.replace(/(?<=[\p{L}\p{N}\)`])-\s+(?=(?:[A-ZÀ-Ý0-9`]))/gu, "\n- ");
+                normalizado = normalizado.replace(/\n{3,}/g, "\n\n");
+
+                return normalizado;
+            });
+        }
+
+        function prepararMarkdownStreaming(markdown = "") {
+            let markdownAjustado = markdown.replace(/\r\n/g, "\n");
+            const blocosCodigo = markdownAjustado.match(/```/g) || [];
+            if (blocosCodigo.length % 2 !== 0) {
+                markdownAjustado += "\n```";
+            }
+
+            return markdownAjustado;
+        }
+
+        function renderizarPreviewStreaming() {
+            renderizacaoStreamingAgendada = null;
+
+            if (!mensagemPendente) {
+                bufferRespostaStreamingRenderizado = "";
+                return;
+            }
+
+            const preview = mensagemPendente.querySelector("[data-stream-preview]");
+            if (!preview) {
+                bufferRespostaStreamingRenderizado = "";
+                return;
+            }
+
+            const markdownStreaming = prepararMarkdownStreaming(bufferRespostaStreaming);
+            if (!markdownStreaming.trim()) {
+                preview.classList.remove("visible");
+                preview.innerHTML = "";
+                bufferRespostaStreamingRenderizado = "";
+                return;
+            }
+
+            if (bufferRespostaStreamingRenderizado === markdownStreaming) {
+                return;
+            }
+
+            preview.classList.add("visible");
+            preview.innerHTML = `<div class="markdown">${renderizarMarkdownSeguro(markdownStreaming)}</div>`;
+            bufferRespostaStreamingRenderizado = markdownStreaming;
+            rolarFim();
+        }
+
+        function agendarRenderizacaoPreviewStreaming() {
+            if (renderizacaoStreamingAgendada !== null) {
+                return;
+            }
+
+            const agendar = window.requestAnimationFrame || (callback => window.setTimeout(callback, 80));
+            renderizacaoStreamingAgendada = agendar(() => renderizarPreviewStreaming());
         }
 
         function extrairResumoMarkdown(markdown = "") {
@@ -2073,6 +2181,11 @@
 
         function mostrarMensagemPendente() {
             removerEstadoVazio();
+            removerMensagemPendente();
+
+            bufferRespostaStreaming = "";
+            bufferRespostaStreamingRenderizado = "";
+            renderizacaoStreamingAgendada = null;
             mensagemPendente = document.createElement("article");
             mensagemPendente.className = "msg assistant";
             mensagemPendente.innerHTML = `
@@ -2081,10 +2194,11 @@
                     <span class="msg-meta">aguarde</span>
                 </div>
                 <div class="msg-body">
-                    <div class="typing">
+                    <div class="stream-status" data-stream-status>
                         <span class="dots" aria-hidden="true"><span></span><span></span><span></span></span>
                         processando consulta
                     </div>
+                    <div class="stream-preview" data-stream-preview></div>
                 </div>
             `;
 
@@ -2092,11 +2206,78 @@
             rolarFim();
         }
 
+        function atualizarMensagemPendenteStatus(status) {
+            if (!mensagemPendente) {
+                mostrarMensagemPendente();
+            }
+
+            const alvoStatus = mensagemPendente?.querySelector("[data-stream-status]");
+            if (!alvoStatus) {
+                return;
+            }
+
+            alvoStatus.innerHTML = `
+                <span class="dots" aria-hidden="true"><span></span><span></span><span></span></span>
+                ${escaparHtml(status || "processando consulta")}
+            `;
+        }
+
+        function adicionarChunkMensagemPendente(conteudo) {
+            if (!conteudo) {
+                return;
+            }
+
+            if (!mensagemPendente) {
+                mostrarMensagemPendente();
+            }
+
+            bufferRespostaStreaming += conteudo;
+            const preview = mensagemPendente?.querySelector("[data-stream-preview]");
+            if (!preview) {
+                return;
+            }
+
+            preview.classList.add("visible");
+            agendarRenderizacaoPreviewStreaming();
+        }
+
         function removerMensagemPendente() {
             if (mensagemPendente) {
                 mensagemPendente.remove();
                 mensagemPendente = null;
             }
+
+            bufferRespostaStreaming = "";
+            bufferRespostaStreamingRenderizado = "";
+            renderizacaoStreamingAgendada = null;
+        }
+
+        function finalizarMensagemPendente(markdown, secoes = [], erro = false, perguntasSugeridas = [], cobertura = null) {
+            if (!mensagemPendente) {
+                adicionarMensagemAssistente(markdown, secoes, erro, perguntasSugeridas, cobertura);
+                return;
+            }
+
+            const horario = new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+            mensagemPendente.className = `msg assistant${erro ? " error" : ""}`;
+            mensagemPendente.innerHTML = `
+                <div class="msg-head">
+                    <span class="msg-role">nsi docs</span>
+                    <span class="msg-meta">${erro ? "erro" : horario}</span>
+                </div>
+                <div class="msg-body">
+                    <div class="markdown">${renderizarMarkdownSeguro(markdown)}</div>
+                    ${chipsContexto(secoes)}
+                    ${erro ? "" : blocoCobertura(cobertura, secoes)}
+                    ${erro ? "" : botoesSugestoes(perguntasSugeridas)}
+                </div>
+            `;
+
+            mensagemPendente = null;
+            bufferRespostaStreaming = "";
+            bufferRespostaStreamingRenderizado = "";
+            renderizacaoStreamingAgendada = null;
+            rolarFim();
         }
 
         function adicionarMensagemAssistente(markdown, secoes = [], erro = false, perguntasSugeridas = [], cobertura = null) {
@@ -2121,6 +2302,75 @@
 
             elementos.mensagens.appendChild(bloco);
             rolarFim();
+        }
+
+        async function consumirFluxoConsulta(resposta) {
+            const leitor = resposta.body?.getReader();
+            if (!leitor) {
+                throw new Error("stream de resposta indisponível neste navegador");
+            }
+
+            const decoder = new TextDecoder();
+            let buffer = "";
+            let respostaFinal = null;
+
+            while (true) {
+                const { value, done } = await leitor.read();
+                buffer += decoder.decode(value || new Uint8Array(), { stream: !done });
+
+                let quebraLinha = buffer.indexOf("\n");
+                while (quebraLinha >= 0) {
+                    const linha = buffer.slice(0, quebraLinha).trim();
+                    buffer = buffer.slice(quebraLinha + 1);
+
+                    if (linha) {
+                        const evento = JSON.parse(linha);
+                        if (evento.tipo === "status") {
+                            atualizarMensagemPendenteStatus(evento.mensagem || "processando consulta");
+                        } else if (evento.tipo === "chunk") {
+                            adicionarChunkMensagemPendente(evento.conteudo || "");
+                        } else if (evento.tipo === "complete") {
+                            respostaFinal = evento;
+                            finalizarMensagemPendente(
+                                evento.resposta || bufferRespostaStreaming || "",
+                                evento.secoesUtilizadas || [],
+                                false,
+                                evento.perguntasSugeridas || [],
+                                evento.cobertura || null);
+                        } else if (evento.tipo === "error") {
+                            throw new Error(evento.mensagem || "falha ao consultar");
+                        }
+                    }
+
+                    quebraLinha = buffer.indexOf("\n");
+                }
+
+                if (done) {
+                    break;
+                }
+            }
+
+            const restante = buffer.trim();
+            if (restante) {
+                const eventoFinal = JSON.parse(restante);
+                if (eventoFinal.tipo === "complete") {
+                    respostaFinal = eventoFinal;
+                    finalizarMensagemPendente(
+                        eventoFinal.resposta || bufferRespostaStreaming || "",
+                        eventoFinal.secoesUtilizadas || [],
+                        false,
+                        eventoFinal.perguntasSugeridas || [],
+                        eventoFinal.cobertura || null);
+                } else if (eventoFinal.tipo === "error") {
+                    throw new Error(eventoFinal.mensagem || "falha ao consultar");
+                }
+            }
+
+            if (!respostaFinal) {
+                throw new Error("fluxo encerrado sem resposta final");
+            }
+
+            return respostaFinal;
         }
 
         function obterHistorico() {
@@ -2300,7 +2550,7 @@
             definirEstadoPergunta(true);
 
             try {
-                const resposta = await fetch("/api/chat/perguntar", {
+                const resposta = await fetch("/api/chat/perguntar-stream", {
                     method: "POST",
                     headers: {
                         "Content-Type": "application/json"
@@ -2315,21 +2565,20 @@
                     throw new Error("timeout da consulta; tente algo mais específico");
                 }
 
-                const dados = await resposta.json();
                 if (!resposta.ok) {
+                    const dados = await resposta.json();
                     throw new Error(dados.mensagem || "falha ao consultar");
                 }
 
-                adicionarMensagemAssistente(
-                    dados.resposta,
-                    dados.secoesUtilizadas || [],
-                    false,
-                    dados.perguntasSugeridas || [],
-                    dados.cobertura || null);
-                salvarHistorico(pergunta, dados.resposta);
+                const dados = await consumirFluxoConsulta(resposta);
+                salvarHistorico(pergunta, dados.resposta || "");
                 aviso(elementos.mensagemChat, "ok", "success");
             } catch (erro) {
-                adicionarMensagemAssistente(erro.message, [], true);
+                if (mensagemPendente) {
+                    finalizarMensagemPendente(erro.message, [], true);
+                } else {
+                    adicionarMensagemAssistente(erro.message, [], true);
+                }
                 aviso(elementos.mensagemChat, erro.message, "error");
             } finally {
                 definirEstadoPergunta(false);

@@ -1,9 +1,11 @@
 using Microsoft.AspNetCore.Http.Features;
+using System.Text.Json;
 using NsiDocs;
 using NsiDocs.Configuracoes;
 using NsiDocs.Servicos;
 
 var builder = WebApplication.CreateBuilder(args);
+var jsonStreamOptions = new JsonSerializerOptions(JsonSerializerDefaults.Web);
 
 builder.Services.Configure<FormOptions>(options =>
 {
@@ -145,6 +147,37 @@ app.MapPost("/api/chat/perguntar", async (PerguntaRequestDto request, AplicacaoN
     catch (Exception ex)
     {
         return Results.BadRequest(new ErroRespostaDto(ex.Message));
+    }
+});
+
+app.MapPost("/api/chat/perguntar-stream", async (PerguntaRequestDto request, AplicacaoNsiDocs aplicacao, HttpContext httpContext, CancellationToken cancellationToken) =>
+{
+    if (string.IsNullOrWhiteSpace(request.Pergunta))
+    {
+        httpContext.Response.StatusCode = StatusCodes.Status400BadRequest;
+        await httpContext.Response.WriteAsJsonAsync(
+            new ErroRespostaDto("Informe uma pergunta para consultar a documentacao."),
+            cancellationToken);
+        return;
+    }
+
+    httpContext.Features.Get<IHttpResponseBodyFeature>()?.DisableBuffering();
+    httpContext.Response.StatusCode = StatusCodes.Status200OK;
+    httpContext.Response.ContentType = "application/x-ndjson; charset=utf-8";
+    httpContext.Response.Headers.CacheControl = "no-cache, no-store, must-revalidate";
+    httpContext.Response.Headers.Pragma = "no-cache";
+    httpContext.Response.Headers.Expires = "0";
+    httpContext.Response.Headers["X-Accel-Buffering"] = "no";
+
+    await foreach (var evento in aplicacao.PerguntarStreamingAsync(
+        request.Pergunta.Trim(),
+        request.DocumentosSelecionados,
+        cancellationToken))
+    {
+        var linha = JsonSerializer.Serialize(evento, jsonStreamOptions);
+        await httpContext.Response.WriteAsync(linha, cancellationToken);
+        await httpContext.Response.WriteAsync("\n", cancellationToken);
+        await httpContext.Response.Body.FlushAsync(cancellationToken);
     }
 });
 

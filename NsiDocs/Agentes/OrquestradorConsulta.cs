@@ -21,27 +21,51 @@ internal sealed class OrquestradorConsulta
         _configuracao = configuracao;
     }
 
-    public async Task<ResultadoConsulta> ProcessarAsync(string pergunta)
+    public Task<ResultadoConsulta> ProcessarAsync(
+        string pergunta,
+        CancellationToken cancellationToken = default)
+    {
+        return ProcessarInternoAsync(pergunta, null, null, cancellationToken);
+    }
+
+    public Task<ResultadoConsulta> ProcessarStreamingAsync(
+        string pergunta,
+        Func<string, CancellationToken, Task> publicarStatus,
+        Func<string, CancellationToken, Task> publicarChunk,
+        CancellationToken cancellationToken = default)
+    {
+        return ProcessarInternoAsync(pergunta, publicarStatus, publicarChunk, cancellationToken);
+    }
+
+    private async Task<ResultadoConsulta> ProcessarInternoAsync(
+        string pergunta,
+        Func<string, CancellationToken, Task>? publicarStatus,
+        Func<string, CancellationToken, Task>? publicarChunk,
+        CancellationToken cancellationToken)
     {
         var planejador = _fabricaAgentes.CriarPlanejador();
         var analista = _fabricaAgentes.CriarAnalistaContexto();
         var respondedor = _fabricaAgentes.CriarRespondedor();
         var formatador = _fabricaAgentes.CriarFormatador();
 
+        await PublicarStatusAsync(publicarStatus, "planejando consulta", cancellationToken);
         var respostaPlanejador = await ExecutorAgente.ObterRespostaAsync(
             planejador,
             pergunta,
-            _configuracao.TimeoutPlanejador);
+            _configuracao.TimeoutPlanejador,
+            cancellationToken);
 
         var planoConsulta = InterpretarPlanoConsulta(respostaPlanejador);
 
         List<SecaoDocumento> secoesRecuperadas;
+        await PublicarStatusAsync(publicarStatus, "buscando trechos relevantes", cancellationToken);
         try
         {
             secoesRecuperadas = await _fabricaAgentes.BuscarSecoesRelevantesComPluginAsync(
                 pergunta,
                 planoConsulta,
-                _configuracao.QuantidadeSecoesRecuperadas);
+                _configuracao.QuantidadeSecoesRecuperadas,
+                cancellationToken);
         }
         catch
         {
@@ -58,6 +82,7 @@ internal sealed class OrquestradorConsulta
 
         if (secoesUtilizadas.Count == 0)
         {
+            await PublicarStatusAsync(publicarStatus, "nenhum trecho relevante encontrado", cancellationToken);
             return new ResultadoConsulta
             {
                 RespostaFinal = "Nao encontrei trechos relevantes na documentacao.",
@@ -67,6 +92,7 @@ internal sealed class OrquestradorConsulta
 
         var contextoRecuperado = _recuperadorContexto.MontarContexto(secoesUtilizadas);
 
+        await PublicarStatusAsync(publicarStatus, "consolidando contexto", cancellationToken);
         var contextoConsolidado = await ExecutorAgente.ObterRespostaAsync(
             analista,
             $"""
@@ -81,8 +107,10 @@ internal sealed class OrquestradorConsulta
              Trechos recuperados:
              {contextoRecuperado}
              """,
-            _configuracao.TimeoutAnalista);
+            _configuracao.TimeoutAnalista,
+            cancellationToken);
 
+        await PublicarStatusAsync(publicarStatus, "redigindo resposta tecnica", cancellationToken);
         var respostaTecnica = await ExecutorAgente.ObterRespostaAsync(
             respondedor,
             $"""
@@ -92,18 +120,38 @@ internal sealed class OrquestradorConsulta
              Contexto consolidado:
              {contextoConsolidado}
              """,
-            _configuracao.TimeoutRespondedor);
+            _configuracao.TimeoutRespondedor,
+            cancellationToken);
 
-        var respostaFinal = await ExecutorAgente.ObterRespostaAsync(
-            formatador,
-            respostaTecnica,
-            _configuracao.TimeoutFormatador);
+        await PublicarStatusAsync(publicarStatus, "formatando resposta final", cancellationToken);
+        var respostaFinal = publicarChunk is null
+            ? await ExecutorAgente.ObterRespostaAsync(
+                formatador,
+                respostaTecnica,
+                _configuracao.TimeoutFormatador,
+                cancellationToken)
+            : await ExecutorAgente.ObterRespostaStreamingAsync(
+                formatador,
+                respostaTecnica,
+                _configuracao.TimeoutFormatador,
+                publicarChunk,
+                cancellationToken);
 
         return new ResultadoConsulta
         {
             RespostaFinal = respostaFinal,
             SecoesUtilizadas = secoesUtilizadas
         };
+    }
+
+    private static Task PublicarStatusAsync(
+        Func<string, CancellationToken, Task>? publicarStatus,
+        string mensagem,
+        CancellationToken cancellationToken)
+    {
+        return publicarStatus is null
+            ? Task.CompletedTask
+            : publicarStatus(mensagem, cancellationToken);
     }
 
     private static PlanoConsulta InterpretarPlanoConsulta(string respostaPlanejador)
