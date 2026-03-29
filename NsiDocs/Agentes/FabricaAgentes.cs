@@ -55,6 +55,12 @@ internal sealed class FabricaAgentes
                             Temas: [lista curta separada por virgula]
                             Objetivo: [o que a resposta precisa entregar]
 
+                            Regras para "Temas":
+                            - Use de 3 a 7 termos concretos e buscaveis.
+                            - Prefira substantivos tecnicos, nomes de componentes, tecnologias, cabecalhos, endpoints, entidades, modulos ou conceitos que provavelmente aparecam literalmente na documentacao.
+                            - Evite termos vagos como "detalhes", "informacoes", "coisa", "geral".
+                            - Se a pergunta estiver abstrata demais, traduza para conceitos tecnicos mais localizaveis na documentacao.
+
                             INDICE DISPONIVEL:
                             {GerarIndiceDocumentacao()}
                             """,

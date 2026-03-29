@@ -171,24 +171,34 @@ Desde a primeira otimização da camada de busca, a normalizacao dos campos nao 
 - `ProjetoNormalizado`
 - `TituloNormalizado`
 - `ConteudoNormalizado`
+- `TokensTitulo`
+- `TokensConteudo`
+- `TokensCombinados`
+- `OrdemNoProjeto`
 
 Na consulta, o recuperador reutiliza esses campos ja preparados e so normaliza a pergunta e o projeto alvo.
 
 Fatores relevantes do score:
 
 - bonus forte para projeto alvo quando ele bate com a secao
-- peso alto quando o termo aparece no titulo
-- peso menor quando aparece no conteudo
-- bonus por temas tecnicos conhecidos, como:
-  - stack / tecnologias
-  - autenticacao / seguranca / permissoes
-  - banco / dados
-  - roteamento / URLs / views
-  - logs / observabilidade
-  - emails / SMTP
+- peso alto para termos da pergunta quando aparecem no titulo
+- peso menor para termos da pergunta quando aparecem no conteudo
+- peso intermediario para termos vindos de `Temas` e `Objetivo`
+- bonus por cobertura da consulta:
+  - quantos termos relevantes da pergunta aparecem na secao
+  - quantos aparecem especificamente no titulo
+- bonus por frases significativas:
+  - bigramas/trigramas da pergunta e dos temas
+  - isso ajuda em consultas como `fluxo de autenticacao`, `stack backend`, `camada de acesso`
+- ponderacao por raridade do termo entre as secoes
+  - termos raros valem mais do que termos muito repetidos
+- bonus leve de vizinhanca estrutural
+  - secoes adjacentes e da mesma trilha hierarquica podem subir um pouco se uma secao fortemente relacionada ja foi bem pontuada
 - pequena penalizacao para secoes muito grandes
 
-Isso mostra um ponto importante do projeto: a recuperacao nao e puramente vetorial nem totalmente delegada ao modelo. Existe uma camada heuristica explicita que ajuda a manter previsibilidade.
+Outro detalhe importante: a analise lexical tambem gera variacoes simples de termos, como singular/plural e fragmentos de tokens compostos (`api-rest`, `automações`, `integrações`). Isso melhora a busca para documentacoes diferentes sem depender de regras especificas por projeto.
+
+Isso mostra um ponto importante do projeto: a recuperacao nao e puramente vetorial nem totalmente delegada ao modelo. Existe uma camada heuristica explicita, mas agora mais generica, que ajuda a manter previsibilidade para qualquer conjunto novo de `.md`.
 
 ### 4.6 Corte entre Secoes Recuperadas e Secoes Utilizadas
 Depois da busca, o sistema separa dois conceitos:
