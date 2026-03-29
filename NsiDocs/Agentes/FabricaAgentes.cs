@@ -2,6 +2,7 @@ using System.Text;
 using System.Text.Json;
 using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.Agents;
+using Microsoft.SemanticKernel.Connectors.Ollama;
 using NsiDocs.Configuracoes;
 using NsiDocs.Modelos;
 using NsiDocs.Plugins;
@@ -57,6 +58,7 @@ internal sealed class FabricaAgentes
                             INDICE DISPONIVEL:
                             {GerarIndiceDocumentacao()}
                             """,
+            Arguments = CriarArgumentosDeterministicos(),
             Kernel = _kernel
         };
     }
@@ -74,8 +76,22 @@ internal sealed class FabricaAgentes
                             - Use apenas fatos presentes nos trechos.
                             - Destaque projeto, secao e pontos tecnicos relevantes.
                             - Descarte repeticoes.
+                            - Nao invente conexoes nem complete lacunas.
+                            - Responda exatamente nesta estrutura:
+                              Resposta principal: [conclusao central em uma frase]
+                              Fatos confirmados:
+                              - [fato confirmado]
+                              - [fato confirmado]
+                              Lacunas do contexto:
+                              - [detalhe importante que nao apareceu]
+                              Termos tecnicos centrais:
+                              - [termo, tecnologia, endpoint, cabecalho, componente, claim ou regra]
+                            - Se nao houver lacunas relevantes, escreva:
+                              Lacunas do contexto:
+                              - nenhuma lacuna relevante identificada nos trechos recuperados
                             - Gere no maximo {_configuracao.LimiteLinhasAnalista} linhas.
                             """,
+            Arguments = CriarArgumentosDeterministicos(),
             Kernel = _kernel
         };
     }
@@ -92,11 +108,20 @@ internal sealed class FabricaAgentes
                            Regras:
                            - Responda em portugues BR.
                            - Nao invente nada.
-                           - Se a informacao nao estiver clara no contexto, diga:
-                             "Nao encontrei essa informacao na documentacao recuperada."
+                           - Use a estrutura do contexto consolidado como fonte principal: resposta principal, fatos confirmados, lacunas do contexto e termos tecnicos centrais.
+                           - Se o contexto contiver a resposta, responda diretamente na primeira linha.
+                           - So use o fallback "Nao encontrei essa informacao na documentacao recuperada." quando realmente nao houver base suficiente no contexto.
+                           - Nunca troque uma resposta valida por fallback apenas por causa do modo de resposta.
+                           - Preserve a mesma base factual entre os modos curta, normal e detalhada.
+                           - Nunca use linguagem especulativa ou alternativas nao sustentadas pelo contexto recuperado.
+                           - Se houver qualquer duvida, prefira os trechos originais recuperados em vez de inferir algo novo.
+                           - Cite explicitamente os termos tecnicos centrais apenas quando eles estiverem presentes no contexto consolidado ou nos trechos originais.
+                           - Quando um detalhe importante nao estiver documentado, use a secao de lacunas do contexto para explicitar esse limite em vez de completar a resposta por inferencia.
                            - Quando apropriado, use listas com "-".
-                           - Seja tecnico e objetivo.
+                           - Seja tecnico, objetivo e previsivel.
+                           - Siga exatamente o contrato recebido no prompt para o perfil da pergunta e o modo de resposta.
                            """,
+            Arguments = CriarArgumentosDeterministicos(),
             Kernel = _kernel
         };
     }
@@ -110,6 +135,7 @@ internal sealed class FabricaAgentes
                             Voce formata a resposta final para console.
                             Regras:
                             - Use markdown simples.
+                            - Preserve a primeira resposta factual recebida; ela nao pode sumir nem ser trocada por fragmentos.
                             - Prefira titulos curtos e listas para facilitar leitura.
                             - Se houver diagrama ASCII (com +, |, ->), envolva obrigatoriamente em bloco:
                               ```text
@@ -119,8 +145,38 @@ internal sealed class FabricaAgentes
                             - Preserve o conteudo tecnico.
                             - Remova repeticoes.
                             - Nao adicione informacoes novas.
+                            - Respeite o contrato recebido no campo "Modo de saida".
                             - Limite a resposta a no maximo {_configuracao.LimiteLinhasFormatador} linhas.
                             """,
+            Arguments = CriarArgumentosDeterministicos(),
+            Kernel = _kernel
+        };
+    }
+
+    public ChatCompletionAgent CriarRespondedorFinal()
+    {
+        return new ChatCompletionAgent
+        {
+            Name = "RespondedorFinal",
+            Instructions = """
+                           Voce e o assistente de documentacao tecnica do NSI do Senac RN.
+                           Sua tarefa e gerar a resposta final ja em markdown, sem depender de uma etapa posterior de formatacao.
+
+                           Regras:
+                           - Responda apenas com base no contexto recebido.
+                           - Responda em portugues BR.
+                           - Preserve a mesma base factual entre os modos curta, normal e detalhada.
+                           - A primeira linha deve responder diretamente a pergunta quando o perfil for factual.
+                           - Use titulos curtos e bullets simples apenas quando agregarem clareza.
+                           - Nao use pseudo-tabelas com pipes fora de bloco de codigo.
+                           - Se houver diagrama ASCII, envolva em ```text.
+                           - Nao invente informacoes, exemplos, alternativas ou boas praticas nao sustentadas pelo contexto.
+                           - Quando faltar um detalhe importante, explicite esse limite em vez de completar por inferencia.
+                           - Preserve termos tecnicos centrais quando eles estiverem documentados.
+                           - Nao devolva payload cru, JSON, listas quebradas nem fragmentos soltos.
+                           - O resultado precisa sair pronto para exibicao final no chat.
+                           """,
+            Arguments = CriarArgumentosDeterministicos(),
             Kernel = _kernel
         };
     }
@@ -180,6 +236,16 @@ internal sealed class FabricaAgentes
             NomePluginDocumentacao);
 
         _kernel.Plugins.Add(plugin);
+    }
+
+    private static KernelArguments CriarArgumentosDeterministicos()
+    {
+        return new KernelArguments(new OllamaPromptExecutionSettings
+        {
+            Temperature = 0.1f,
+            TopP = 0.2f,
+            TopK = 20
+        });
     }
 
     private string GerarIndiceDocumentacao()

@@ -750,6 +750,38 @@
             margin-top: 12px;
         }
 
+        .msg-tools {
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-top: 12px;
+        }
+
+        .msg-tool-btn {
+            border: 1px solid var(--line);
+            border-radius: 999px;
+            background: rgba(255, 252, 246, 0.98);
+            padding: 8px 11px;
+            cursor: pointer;
+            color: var(--text-soft);
+            font-family: "IBM Plex Mono", monospace;
+            font-size: 0.74rem;
+        }
+
+        .msg-tool-btn:hover {
+            border-color: rgba(45, 74, 63, 0.28);
+            color: var(--accent);
+            background: rgba(234, 243, 237, 0.96);
+        }
+
+        .msg-tool-btn.copiado {
+            border-color: rgba(47, 119, 87, 0.28);
+            background: rgba(232, 245, 237, 0.96);
+            color: var(--success);
+        }
+
         .coverage {
             margin-top: 12px;
             display: flex;
@@ -878,6 +910,16 @@
             color: var(--text-soft);
         }
 
+        .context-chip-button {
+            cursor: pointer;
+        }
+
+        .context-chip-button:hover {
+            border-color: rgba(45, 74, 63, 0.28);
+            background: rgba(234, 243, 237, 0.96);
+            color: var(--accent);
+        }
+
         .typing {
             display: inline-flex;
             align-items: center;
@@ -990,6 +1032,37 @@
         .composer-footer {
             justify-content: space-between;
             margin-top: 10px;
+        }
+
+        .composer-footer-left {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+            min-width: 0;
+        }
+
+        .modo-resposta {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 8px;
+            border-radius: 999px;
+            border: 1px solid var(--line);
+            background: rgba(255, 252, 246, 0.94);
+        }
+
+        .modo-select {
+            border: 0;
+            background: transparent;
+            color: var(--text);
+            font-family: "IBM Plex Mono", monospace;
+            font-size: 0.76rem;
+            padding-right: 8px;
+        }
+
+        .modo-select:focus {
+            outline: none;
         }
 
         .notice {
@@ -1126,6 +1199,23 @@
             display: flex;
             flex-wrap: wrap;
             gap: 8px;
+        }
+
+        .fonte-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .fonte-conteudo {
+            padding: 14px;
+            border-radius: 16px;
+            border: 1px solid rgba(60, 44, 26, 0.1);
+            background: rgba(255, 252, 246, 0.82);
+        }
+
+        .fonte-conteudo > :last-child {
+            margin-bottom: 0;
         }
 
         .scroll::-webkit-scrollbar,
@@ -1473,7 +1563,17 @@
                 </div>
 
                 <div class="composer-footer">
-                    <div class="helper">perguntas mais específicas costumam ser mais rápidas</div>
+                    <div class="composer-footer-left">
+                        <div class="helper">perguntas mais específicas costumam ser mais rápidas</div>
+                        <label for="modo-resposta" class="modo-resposta">
+                            <span class="tiny">modo</span>
+                            <select id="modo-resposta" class="modo-select">
+                                <option value="curta">curta</option>
+                                <option value="normal" selected>normal</option>
+                                <option value="detalhada">detalhada</option>
+                            </select>
+                        </label>
+                    </div>
                     <div id="contador-caracteres" class="tiny">0 caractere</div>
                 </div>
             </form>
@@ -1545,6 +1645,23 @@
         </div>
     </div>
 
+    <div id="modal-fonte" class="modal" aria-hidden="true">
+        <div class="modal-backdrop" data-fechar-modal-fonte="true"></div>
+        <div class="shell modal-card" role="dialog" aria-modal="true" aria-labelledby="titulo-modal-fonte">
+            <div class="modal-head">
+                <div>
+                    <div id="titulo-modal-fonte" class="brand-title">trecho-fonte</div>
+                    <div id="subtitulo-modal-fonte" class="helper mono"></div>
+                </div>
+                <button id="botao-fechar-modal-fonte" type="button" class="btn">Fechar</button>
+            </div>
+            <div class="modal-body scroll">
+                <div id="meta-modal-fonte" class="fonte-meta"></div>
+                <div id="conteudo-modal-fonte" class="fonte-conteudo markdown"></div>
+            </div>
+        </div>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/dompurify@3.1.6/dist/purify.min.js"></script>
     <script>
@@ -1567,6 +1684,7 @@
             mensagemChat: document.getElementById("mensagem-chat"),
             mensagemUpload: document.getElementById("mensagem-upload"),
             pergunta: document.getElementById("pergunta"),
+            modoResposta: document.getElementById("modo-resposta"),
             contadorCaracteres: document.getElementById("contador-caracteres"),
             arquivo: document.getElementById("arquivo"),
             nomeArquivo: document.getElementById("nome-arquivo"),
@@ -1593,11 +1711,18 @@
             listaDetalhesCobertura: document.getElementById("lista-detalhes-cobertura"),
             listaSecoesCobertura: document.getElementById("lista-secoes-cobertura"),
             listaSugestoesCobertura: document.getElementById("lista-sugestoes-cobertura"),
-            botaoFecharModalCobertura: document.getElementById("botao-fechar-modal-cobertura")
+            botaoFecharModalCobertura: document.getElementById("botao-fechar-modal-cobertura"),
+            modalFonte: document.getElementById("modal-fonte"),
+            tituloModalFonte: document.getElementById("titulo-modal-fonte"),
+            subtituloModalFonte: document.getElementById("subtitulo-modal-fonte"),
+            metaModalFonte: document.getElementById("meta-modal-fonte"),
+            conteudoModalFonte: document.getElementById("conteudo-modal-fonte"),
+            botaoFecharModalFonte: document.getElementById("botao-fechar-modal-fonte")
         };
 
         const chaveHistorico = "nsi-docs-historico";
         const chaveDocumentosSelecionados = "nsi-docs-documentos-selecionados";
+        const chaveModoResposta = "nsi-docs-modo-resposta";
         let documentosCarregados = [];
         let documentosSelecionados = new Set();
         let filtroDocumentos = "";
@@ -1611,7 +1736,11 @@
         let carregandoUpload = false;
         let promptInstalacao = null;
         let sequenciaCobertura = 0;
+        let sequenciaSecaoFonte = 0;
+        let sequenciaResposta = 0;
         const coberturasPorId = new Map();
+        const secoesFontePorId = new Map();
+        const respostasPorId = new Map();
 
         function aviso(elemento, texto, tipo = "") {
             elemento.textContent = texto;
@@ -1903,6 +2032,26 @@
                 .trim();
         }
 
+        function normalizarModoResposta(valor = "") {
+            return ["curta", "normal", "detalhada"].includes(valor) ? valor : "normal";
+        }
+
+        function carregarModoRespostaSalvo() {
+            try {
+                return normalizarModoResposta(localStorage.getItem(chaveModoResposta) || "normal");
+            } catch {
+                return "normal";
+            }
+        }
+
+        function salvarModoResposta() {
+            localStorage.setItem(chaveModoResposta, normalizarModoResposta(elementos.modoResposta.value));
+        }
+
+        function obterModoRespostaSelecionado() {
+            return normalizarModoResposta(elementos.modoResposta.value);
+        }
+
         function obterSelecaoDocumentosSalva() {
             try {
                 const valor = localStorage.getItem(chaveDocumentosSelecionados);
@@ -2021,9 +2170,14 @@
         function resetarConversa() {
             elementos.mensagens.innerHTML = htmlEstadoVazio();
             coberturasPorId.clear();
+            secoesFontePorId.clear();
+            respostasPorId.clear();
             sequenciaCobertura = 0;
+            sequenciaSecaoFonte = 0;
+            sequenciaResposta = 0;
             mensagemPendente = null;
             fecharModalCobertura();
+            fecharModalFonte();
             aviso(elementos.mensagemChat, "");
         }
 
@@ -2042,7 +2196,10 @@
             return `
                 <div class="context">
                     ${secoes.map(secao => `
-                        <span class="context-chip">${escaparHtml(secao.projeto)} -> ${escaparHtml(secao.titulo)}</span>
+                        <button
+                            type="button"
+                            class="context-chip context-chip-button"
+                            data-secao-id="${escaparHtml(registrarSecaoFonte(secao))}">${escaparHtml(secao.projeto)} -> ${escaparHtml(secao.titulo)}</button>
                     `).join("")}
                 </div>
             `;
@@ -2068,6 +2225,34 @@
             });
 
             return id;
+        }
+
+        function registrarSecaoFonte(secao) {
+            const id = `secao-${++sequenciaSecaoFonte}`;
+            secoesFontePorId.set(id, secao);
+            return id;
+        }
+
+        function registrarResposta(markdown = "") {
+            const id = `resposta-${++sequenciaResposta}`;
+            respostasPorId.set(id, markdown);
+            return id;
+        }
+
+        function blocoAcoesResposta(markdown = "") {
+            if (!markdown) {
+                return "";
+            }
+
+            const idResposta = registrarResposta(markdown);
+            return `
+                <div class="msg-tools">
+                    <button
+                        type="button"
+                        class="msg-tool-btn"
+                        data-copiar-resposta-id="${escaparHtml(idResposta)}">copiar resposta</button>
+                </div>
+            `;
         }
 
         function blocoCobertura(cobertura, secoes = []) {
@@ -2133,13 +2318,32 @@
             }
 
             elementos.listaSecoesCobertura.innerHTML = secoes.map(secao => `
-                <span class="context-chip">${escaparHtml(secao.projeto)} -> ${escaparHtml(secao.titulo)}</span>
+                <button
+                    type="button"
+                    class="context-chip context-chip-button"
+                    data-secao-id="${escaparHtml(registrarSecaoFonte(secao))}">${escaparHtml(secao.projeto)} -> ${escaparHtml(secao.titulo)}</button>
             `).join("");
         }
 
         function fecharModalCobertura() {
             elementos.modalCobertura.classList.remove("visible");
             elementos.modalCobertura.setAttribute("aria-hidden", "true");
+        }
+
+        function preencherMetaModalFonte(secao) {
+            const itens = [
+                secao.projeto ? `projeto: ${secao.projeto}` : "",
+                secao.arquivo ? `arquivo: ${secao.arquivo}` : ""
+            ].filter(Boolean);
+
+            elementos.metaModalFonte.innerHTML = itens.length
+                ? itens.map(item => `<span class="context-chip">${escaparHtml(item)}</span>`).join("")
+                : '<div class="helper">sem metadados adicionais</div>';
+        }
+
+        function fecharModalFonte() {
+            elementos.modalFonte.classList.remove("visible");
+            elementos.modalFonte.setAttribute("aria-hidden", "true");
         }
 
         function abrirModalCobertura(idCobertura) {
@@ -2158,6 +2362,57 @@
             elementos.modalCobertura.classList.add("visible");
             elementos.modalCobertura.setAttribute("aria-hidden", "false");
             elementos.botaoFecharModalCobertura.focus();
+        }
+
+        function abrirModalFonte(idSecao) {
+            const secao = secoesFontePorId.get(idSecao);
+            if (!secao) {
+                return;
+            }
+
+            elementos.tituloModalFonte.textContent = secao.titulo || "trecho-fonte";
+            elementos.subtituloModalFonte.textContent = `${secao.projeto || "documentação"} · fonte original`;
+            preencherMetaModalFonte(secao);
+            elementos.conteudoModalFonte.innerHTML = secao.conteudo
+                ? renderizarMarkdownSeguro(secao.conteudo)
+                : '<div class="helper">trecho-fonte indisponível</div>';
+            elementos.modalFonte.classList.add("visible");
+            elementos.modalFonte.setAttribute("aria-hidden", "false");
+            elementos.botaoFecharModalFonte.focus();
+        }
+
+        async function copiarTexto(texto) {
+            if (navigator.clipboard?.writeText) {
+                await navigator.clipboard.writeText(texto);
+                return;
+            }
+
+            const area = document.createElement("textarea");
+            area.value = texto;
+            area.setAttribute("readonly", "true");
+            area.style.position = "fixed";
+            area.style.opacity = "0";
+            document.body.appendChild(area);
+            area.select();
+            document.execCommand("copy");
+            area.remove();
+        }
+
+        async function copiarResposta(idResposta, botao) {
+            const resposta = respostasPorId.get(idResposta);
+            if (!resposta) {
+                return;
+            }
+
+            await copiarTexto(resposta);
+            const rotuloOriginal = botao.dataset.rotuloOriginal || botao.textContent || "copiar resposta";
+            botao.dataset.rotuloOriginal = rotuloOriginal;
+            botao.textContent = "copiado";
+            botao.classList.add("copiado");
+            window.setTimeout(() => {
+                botao.textContent = rotuloOriginal;
+                botao.classList.remove("copiado");
+            }, 1600);
         }
 
         function adicionarMensagemUsuario(texto) {
@@ -2267,6 +2522,7 @@
                 </div>
                 <div class="msg-body">
                     <div class="markdown">${renderizarMarkdownSeguro(markdown)}</div>
+                    ${erro ? "" : blocoAcoesResposta(markdown)}
                     ${chipsContexto(secoes)}
                     ${erro ? "" : blocoCobertura(cobertura, secoes)}
                     ${erro ? "" : botoesSugestoes(perguntasSugeridas)}
@@ -2294,6 +2550,7 @@
                 </div>
                 <div class="msg-body">
                     <div class="markdown">${renderizarMarkdownSeguro(markdown)}</div>
+                    ${erro ? "" : blocoAcoesResposta(markdown)}
                     ${chipsContexto(secoes)}
                     ${erro ? "" : blocoCobertura(cobertura, secoes)}
                     ${erro ? "" : botoesSugestoes(perguntasSugeridas)}
@@ -2557,7 +2814,8 @@
                     },
                     body: JSON.stringify({
                         pergunta,
-                        documentosSelecionados: documentosSelecionadosAtuais
+                        documentosSelecionados: documentosSelecionadosAtuais,
+                        modoResposta: obterModoRespostaSelecionado()
                     })
                 });
 
@@ -2843,10 +3101,27 @@
             elementos.pergunta.focus();
         });
 
-        elementos.mensagens.addEventListener("click", evento => {
+        elementos.mensagens.addEventListener("click", async evento => {
             const botaoCobertura = evento.target.closest("[data-cobertura-id]");
             if (botaoCobertura) {
                 abrirModalCobertura(botaoCobertura.dataset.coberturaId || "");
+                return;
+            }
+
+            const botaoSecao = evento.target.closest("[data-secao-id]");
+            if (botaoSecao) {
+                abrirModalFonte(botaoSecao.dataset.secaoId || "");
+                return;
+            }
+
+            const botaoCopiar = evento.target.closest("[data-copiar-resposta-id]");
+            if (botaoCopiar) {
+                try {
+                    await copiarResposta(botaoCopiar.dataset.copiarRespostaId || "", botaoCopiar);
+                    aviso(elementos.mensagemChat, "resposta copiada", "success");
+                } catch {
+                    aviso(elementos.mensagemChat, "não foi possível copiar a resposta", "error");
+                }
                 return;
             }
 
@@ -2878,8 +3153,17 @@
             }
         });
 
+        elementos.modoResposta.addEventListener("change", () => {
+            elementos.modoResposta.value = obterModoRespostaSelecionado();
+            salvarModoResposta();
+        });
+
         elementos.botaoFecharModalCobertura.addEventListener("click", () => {
             fecharModalCobertura();
+        });
+
+        elementos.botaoFecharModalFonte.addEventListener("click", () => {
+            fecharModalFonte();
         });
 
         elementos.modalCobertura.addEventListener("click", evento => {
@@ -2888,7 +3172,18 @@
             }
         });
 
+        elementos.modalFonte.addEventListener("click", evento => {
+            if (evento.target.closest("[data-fechar-modal-fonte=\"true\"]")) {
+                fecharModalFonte();
+            }
+        });
+
         window.addEventListener("keydown", evento => {
+            if (evento.key === "Escape" && elementos.modalFonte.classList.contains("visible")) {
+                fecharModalFonte();
+                return;
+            }
+
             if (evento.key === "Escape" && elementos.modalCobertura.classList.contains("visible")) {
                 fecharModalCobertura();
             }
@@ -2937,6 +3232,7 @@
             await registrarServiceWorker();
             configurarInstalacaoPwa();
             atualizarConectividadeUI();
+            elementos.modoResposta.value = carregarModoRespostaSalvo();
             resetarConversa();
             renderizarHistorico();
             atualizarContadorCaracteres();

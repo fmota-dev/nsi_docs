@@ -8,8 +8,7 @@ A ideia central do projeto nao e apenas "fazer perguntas para um LLM". O sistema
 - entender a intencao da pergunta
 - localizar os trechos mais relevantes da base documental
 - condensar o contexto necessario
-- produzir a resposta tecnica final
-- formatar a saida para exibicao
+- produzir a resposta final ja pronta para exibicao
 
 Essa divisao torna a aplicacao mais previsivel, mais facil de ajustar e menos dependente de um unico prompt gigante.
 
@@ -93,14 +92,15 @@ Se a selecao vier vazia ou ausente, a consulta usa toda a base carregada. Se vie
 - o plugin do Semantic Kernel seja registrado somente com os documentos permitidos
 - o fallback local use exatamente o mesmo universo
 
-So depois disso o metodo `ProcessarAsync` em [OrquestradorConsulta.cs](C:\Users\fmota\Documents\projetos\Learning\NsiDocs\NsiDocs\Agentes\OrquestradorConsulta.cs) cria quatro agentes por consulta:
+So depois disso o metodo `ProcessarAsync` em [OrquestradorConsulta.cs](C:\Users\fmota\Documents\projetos\Learning\NsiDocs\NsiDocs\Agentes\OrquestradorConsulta.cs) cria, por padrao, tres agentes por consulta:
 
 - `Planejador`
 - `AnalistaContexto`
-- `Respondedor`
-- `Formatador`
+- `RespondedorFinal`
 
 Esses agentes sao construidos pela [FabricaAgentes.cs](C:\Users\fmota\Documents\projetos\Learning\NsiDocs\NsiDocs\Agentes\FabricaAgentes.cs) com prompts especializados e de responsabilidade unica.
+
+Existe um override interno por variavel de ambiente (`NSIDOCS_MODO_ORQUESTRACAO`) para benchmark de arquiteturas com `1`, `2`, `3` ou `4` agentes, mas o default do projeto foi fixado em `3 agentes` porque entregou o melhor equilibrio entre latencia, qualidade e consistencia entre stream e resposta final.
 
 O sistema nao usa um unico agente "faz tudo". Ele monta um pipeline explicito de handoff entre etapas.
 
@@ -248,13 +248,15 @@ Trechos recuperados:
 ...
 ```
 
-### 4.8 Etapa 4: Resposta Tecnica
-O `Respondedor` recebe:
+### 4.8 Etapa 4: Resposta Final
+No pipeline padrao, o `RespondedorFinal` recebe:
 
 - pergunta do usuario
 - contexto consolidado pelo `AnalistaContexto`
+- contrato do perfil da pergunta
+- contrato do modo de resposta
 
-Esse agente tem uma responsabilidade bem definida: responder de forma tecnica e objetiva, apenas com base no contexto consolidado.
+Esse agente tem uma responsabilidade bem definida: responder de forma tecnica e objetiva, apenas com base no contexto consolidado, ja entregando markdown pronto para o chat.
 
 Regras relevantes do prompt:
 
@@ -262,22 +264,21 @@ Regras relevantes do prompt:
 - nao inventar
 - admitir ausencia de informacao quando necessario
 - usar listas quando fizer sentido
+- preservar a mesma base factual entre `curta`, `normal` e `detalhada`
+- nao devolver payload cru, fragmentos soltos nem pseudo-tabelas quebradas
 
-Aqui esta o ganho principal do fluxo multiagente: o agente que gera a resposta final nao precisa decidir sozinho o que procurar em uma base grande. Ele ja recebe um contexto filtrado.
+Aqui esta o ganho principal do fluxo multiagente padrao: o agente que gera a resposta final nao precisa decidir sozinho o que procurar em uma base grande. Ele ja recebe um contexto filtrado e um contrato de saida mais fechado.
 
-### 4.9 Etapa 5: Formatacao Final
-O `Formatador` recebe a resposta tecnica e faz a ultima limpeza.
+### 4.9 Observacao sobre o Formatador
+O projeto ainda mantem uma variante alternativa com `4 agentes`, em que a resposta tecnica passa por um `Formatador` separado.
 
-Seu papel e:
+Essa variante continua disponivel apenas para benchmark interno, mas nao e mais o default porque:
 
-- manter markdown simples
-- reduzir repeticoes
-- preservar o conteudo tecnico
-- limitar o tamanho final
-- evitar formatacao ruim para console/chat
-- encapsular diagramas ASCII em bloco de codigo quando necessario
+- adiciona mais latencia
+- aumenta a diferenca entre preview do stream e resposta final
+- cria mais um ponto de variacao no pipeline
 
-Esse ultimo agente existe porque a melhor resposta tecnica nem sempre e a melhor resposta exibivel. A formatacao final e tratada como uma responsabilidade separada.
+Na arquitetura atual, a responsabilidade de resposta e formatacao final fica concentrada no `RespondedorFinal`.
 
 ### 4.10 Saida para a API e Frontend
 Ao final do pipeline, o sistema devolve:
@@ -346,15 +347,17 @@ No frontend:
 
 - excesso de ruido no contexto enviado ao respondedor
 
-### 5.3 Respondedor
+### 5.3 RespondedorFinal
 **Entrada**
 
 - pergunta do usuario
 - contexto consolidado
+- contrato do perfil da pergunta
+- contrato do modo de resposta
 
 **Responsabilidade**
 
-- produzir a resposta tecnica final em linguagem natural
+- produzir a resposta final em markdown, ja pronta para o frontend
 
 **Saida**
 
@@ -367,7 +370,7 @@ No frontend:
 ### 5.4 Formatador
 **Entrada**
 
-- resposta tecnica do `Respondedor`
+- resposta tecnica intermediaria do `Respondedor`
 
 **Responsabilidade**
 
@@ -383,14 +386,17 @@ No frontend:
 
 - saidas confusas, longas demais ou com markdown ruim
 
+**Observacao**
+
+- esse agente nao participa do pipeline padrao atual; ele fica reservado para a variante de `4 agentes`, usada apenas em benchmark interno
+
 ## 6. Por que Multiplos Agentes?
 ### 6.1 Abordagem Atual
 Na abordagem atual, cada agente faz uma parte do trabalho:
 
 - um entende a intencao
 - outro resume o contexto
-- outro responde
-- outro formata
+- outro responde e ja entrega a saida final
 
 ### 6.2 Como seria com um Agente Unico
 Com um agente unico, o prompt precisaria fazer tudo ao mesmo tempo:
@@ -561,6 +567,7 @@ Para tuning avancado do pipeline, a aplicacao tambem aceita overrides por variav
 - `NSIDOCS_SECOES_UTILIZADAS`
 - `NSIDOCS_LIMITE_LINHAS_ANALISTA`
 - `NSIDOCS_LIMITE_LINHAS_FORMATADOR`
+- `NSIDOCS_MODO_ORQUESTRACAO`
 
 Esses overrides foram adicionados para benchmark e tuning operacional. O frontend continua configurando apenas `endpoint` e `modelo`.
 
@@ -575,7 +582,7 @@ Esses overrides foram adicionados para benchmark e tuning operacional. O fronten
 - `TimeoutRespondedor`
   - normalmente o mais sensivel para respostas grandes
 - `TimeoutFormatador`
-  - afeta apenas a etapa final de limpeza e apresentacao
+  - so afeta a variante opcional de `4 agentes`
 
 Defaults atuais do perfil adotado:
 
@@ -613,7 +620,7 @@ Antes de mexer nesses valores, existe um tuning mais barato e normalmente melhor
 - `LimiteLinhasAnalista`
   - controla o quanto o `AnalistaContexto` pode condensar antes de enviar para o `Respondedor`
 - `LimiteLinhasFormatador`
-  - controla o teto de apresentacao da resposta final
+  - controla o teto de apresentacao da resposta final na arquitetura com `4 agentes`; no pipeline padrao, o mesmo contrato de formatacao ainda e reaproveitado pelo `RespondedorFinal`
 
 Defaults atuais do perfil adotado:
 
@@ -644,6 +651,26 @@ Resultado consolidado:
   - aumento de custo e lentidao sem ganho consistente de qualidade; em algumas perguntas o resultado piorou
 
 Por isso o **Perfil B** foi mantido como default do projeto.
+
+### 10.6 Arquitetura multiagente adotada
+Tambem foi executado um benchmark comparando arquiteturas com `4`, `3`, `2` e `1` agente.
+
+Resultado consolidado:
+
+- `4 agentes`
+  - melhor modularidade, mas maior latencia media e maior diferenca entre preview do stream e resposta final
+- `3 agentes`
+  - melhor equilibrio entre qualidade, latencia e consistencia visual
+- `2 agentes`
+  - mais rapido, mas com pior desempenho em perguntas comparativas e multi-documento
+- `1 agente`
+  - latencia menor, porem com mais simplificacao e menor robustez em cenarios complexos
+
+Por isso o projeto foi fixado com **`3 agentes` como default**:
+
+- `Planejador`
+- `AnalistaContexto`
+- `RespondedorFinal`
 
 ## 11. Decisoes Tecnicas e Tradeoffs
 ### 11.1 Markdown como base documental

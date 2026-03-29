@@ -141,6 +141,7 @@ internal sealed class AplicacaoNsiDocs
     public async Task<RespostaChatDto> PerguntarAsync(
         string pergunta,
         IReadOnlyList<string>? documentosSelecionados = null,
+        string? modoResposta = null,
         CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(pergunta))
@@ -157,9 +158,10 @@ internal sealed class AplicacaoNsiDocs
                 throw new InvalidOperationException("Nenhum documento selecionado e valido para a consulta.");
             }
 
+            var modoRespostaNormalizado = ModoRespostaConsultaHelper.Normalizar(modoResposta);
             var orquestradorConsulta = CriarOrquestradorConsulta(projetosConsulta);
 
-            var resultado = await orquestradorConsulta.ProcessarAsync(pergunta, cancellationToken);
+            var resultado = await orquestradorConsulta.ProcessarAsync(pergunta, modoRespostaNormalizado, cancellationToken);
             var perguntasSugeridas = _geradorSugestoesPerguntas.Gerar(pergunta, resultado.SecoesUtilizadas);
             var cobertura = _avaliadorCoberturaConsulta.Avaliar(
                 pergunta,
@@ -169,7 +171,7 @@ internal sealed class AplicacaoNsiDocs
             return new RespostaChatDto(
                 resultado.RespostaFinal,
                 resultado.SecoesUtilizadas
-                    .Select(secao => new SecaoUtilizadaDto(secao.Projeto, secao.Titulo))
+                    .Select(MapearSecaoUtilizada)
                     .ToList(),
                 perguntasSugeridas,
                 cobertura);
@@ -183,6 +185,7 @@ internal sealed class AplicacaoNsiDocs
     public async IAsyncEnumerable<EventoStreamChatDto> PerguntarStreamingAsync(
         string pergunta,
         IReadOnlyList<string>? documentosSelecionados = null,
+        string? modoResposta = null,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(pergunta))
@@ -209,9 +212,11 @@ internal sealed class AplicacaoNsiDocs
                         throw new InvalidOperationException("Nenhum documento selecionado e valido para a consulta.");
                     }
 
+                    var modoRespostaNormalizado = ModoRespostaConsultaHelper.Normalizar(modoResposta);
                     var orquestradorConsulta = CriarOrquestradorConsulta(projetosConsulta);
                     var resultado = await orquestradorConsulta.ProcessarStreamingAsync(
                         pergunta,
+                        modoRespostaNormalizado,
                         (mensagem, ct) => canal.Writer.WriteAsync(
                             new EventoStreamChatDto("status", Mensagem: mensagem),
                             ct).AsTask(),
@@ -231,7 +236,7 @@ internal sealed class AplicacaoNsiDocs
                             "complete",
                             Resposta: resultado.RespostaFinal,
                             SecoesUtilizadas: resultado.SecoesUtilizadas
-                                .Select(secao => new SecaoUtilizadaDto(secao.Projeto, secao.Titulo))
+                                .Select(MapearSecaoUtilizada)
                                 .ToList(),
                             PerguntasSugeridas: perguntasSugeridas,
                             Cobertura: cobertura),
@@ -349,6 +354,15 @@ internal sealed class AplicacaoNsiDocs
         }
 
         return sb.ToString();
+    }
+
+    private static SecaoUtilizadaDto MapearSecaoUtilizada(SecaoDocumento secao)
+    {
+        return new SecaoUtilizadaDto(
+            secao.Projeto,
+            secao.Titulo,
+            secao.Arquivo,
+            secao.Conteudo);
     }
 
     private OrquestradorConsulta CriarOrquestradorConsulta(List<ProjetoDocumentacao> projetos)
@@ -557,7 +571,7 @@ internal sealed record DocumentoDto(string Identificador, string Nome, string Ar
 
 internal sealed record DocumentoUploadResultadoDto(string Arquivo, string Mensagem);
 
-internal sealed record SecaoUtilizadaDto(string Projeto, string Titulo);
+internal sealed record SecaoUtilizadaDto(string Projeto, string Titulo, string Arquivo, string Conteudo);
 
 internal sealed record RespostaChatDto(
     string Resposta,

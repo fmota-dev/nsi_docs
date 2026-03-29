@@ -137,6 +137,7 @@ app.MapPost("/api/chat/perguntar", async (PerguntaRequestDto request, AplicacaoN
         var resposta = await aplicacao.PerguntarAsync(
             request.Pergunta.Trim(),
             request.DocumentosSelecionados,
+            request.ModoResposta,
             cancellationToken);
         return Results.Ok(resposta);
     }
@@ -172,6 +173,7 @@ app.MapPost("/api/chat/perguntar-stream", async (PerguntaRequestDto request, Apl
     await foreach (var evento in aplicacao.PerguntarStreamingAsync(
         request.Pergunta.Trim(),
         request.DocumentosSelecionados,
+        request.ModoResposta,
         cancellationToken))
     {
         var linha = JsonSerializer.Serialize(evento, jsonStreamOptions);
@@ -188,7 +190,7 @@ app.Run();
 
 namespace NsiDocs
 {
-    internal sealed record PerguntaRequestDto(string Pergunta, IReadOnlyList<string>? DocumentosSelecionados);
+    internal sealed record PerguntaRequestDto(string Pergunta, IReadOnlyList<string>? DocumentosSelecionados, string? ModoResposta = null);
 
     internal sealed record ConfiguracaoOllamaRequestDto(string Endpoint, string Modelo);
 

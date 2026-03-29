@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
 using System.Text.Json;
+using NsiDocs.Modelos;
 
 namespace NsiDocs.Configuracoes;
 
@@ -20,6 +21,7 @@ internal sealed class ConfiguracaoAplicacao
     public int QuantidadeSecoesUtilizadas { get; init; } = 6;
     public int LimiteLinhasAnalista { get; init; } = 25;
     public int LimiteLinhasFormatador { get; init; } = 40;
+    public ModoOrquestracaoConsulta ModoOrquestracao { get; init; } = ModoOrquestracaoConsulta.TresAgentes;
 
     public static ConfiguracaoAplicacao Carregar()
     {
@@ -46,7 +48,9 @@ internal sealed class ConfiguracaoAplicacao
             QuantidadeSecoesRecuperadas = LerInteiroAmbiente("NSIDOCS_SECOES_RECUPERADAS", 12),
             QuantidadeSecoesUtilizadas = LerInteiroAmbiente("NSIDOCS_SECOES_UTILIZADAS", 6),
             LimiteLinhasAnalista = LerInteiroAmbiente("NSIDOCS_LIMITE_LINHAS_ANALISTA", 25),
-            LimiteLinhasFormatador = LerInteiroAmbiente("NSIDOCS_LIMITE_LINHAS_FORMATADOR", 40)
+            LimiteLinhasFormatador = LerInteiroAmbiente("NSIDOCS_LIMITE_LINHAS_FORMATADOR", 40),
+            ModoOrquestracao = ModoOrquestracaoConsultaHelper.Normalizar(
+                Environment.GetEnvironmentVariable("NSIDOCS_MODO_ORQUESTRACAO"))
         };
     }
 
@@ -66,7 +70,8 @@ internal sealed class ConfiguracaoAplicacao
             QuantidadeSecoesRecuperadas = QuantidadeSecoesRecuperadas,
             QuantidadeSecoesUtilizadas = QuantidadeSecoesUtilizadas,
             LimiteLinhasAnalista = LimiteLinhasAnalista,
-            LimiteLinhasFormatador = LimiteLinhasFormatador
+            LimiteLinhasFormatador = LimiteLinhasFormatador,
+            ModoOrquestracao = ModoOrquestracao
         };
     }
 
